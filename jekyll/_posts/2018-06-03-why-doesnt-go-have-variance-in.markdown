@@ -21,8 +21,8 @@ that a value of type A can always be used, where a value of type B is required.
 Go doesn't have explicit subtype relationships - the closest it has is
 [assignability](https://golang.org/ref/spec#Assignability) which mostly
 determines whether types can be used interchangeably. Probably the most
-important case of this is given by interfaces: If a type T (whether its a
-concrete type, or itself an interface) implements an interface I, then T can be
+important case of this is given by interfaces: If a type T (whether it's a
+concrete type, or is itself an interface) implements an interface I, then T can be
 viewed as a subtype of I. In that sense,
 [`*bytes.Buffer`](https://godoc.org/bytes#Buffer) is a subtype of
 [io.ReadWriter](https://godoc.org/io#ReadWriter), which is a subtype of
