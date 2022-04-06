@@ -1,0 +1,312 @@
+<!doctype html><html lang=en dir=auto><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,shrink-to-fit=no"><meta name=robots content="index, follow"><title>Scrapping contracts | Mero's Blog</title><meta name=keywords content="golang,programming"><meta name=description content="I describe a way to simplify the generics design. The ideas are not particularly novel and have been expressed to various degrees by other people as well. I hope to provide a more complete view of the design though."><meta name=author content><link rel=canonical href=https://blog.merovius.de/posts/2018-09-05-scrapping_contracts/><link crossorigin=anonymous href=/assets/css/stylesheet.min.48a18943c2fc15c38a372b8dde1f5e5dc0bc64fa6cb90f5a817d2f8c76b7f3ae.css integrity="sha256-SKGJQ8L8FcOKNyuN3h9eXcC8ZPpsuQ9agX0vjHa3864=" rel="preload stylesheet" as=style><script defer crossorigin=anonymous src=/assets/js/highlight.min.4dcb3c4f38462f66c6b6137227726f5543cb934cca9788f041c087e374491df2.js integrity="sha256-Tcs8TzhGL2bGthNyJ3JvVUPLk0zKl4jwQcCH43RJHfI=" onload=hljs.initHighlightingOnLoad()></script>
+<link rel=icon href=https://blog.merovius.de/favicon.ico><link rel=icon type=image/png sizes=16x16 href=https://blog.merovius.de/favicon-16x16.png><link rel=icon type=image/png sizes=32x32 href=https://blog.merovius.de/favicon-32x32.png><link rel=apple-touch-icon href=https://blog.merovius.de/apple-touch-icon.png><link rel=mask-icon href=https://blog.merovius.de/safari-pinned-tab.svg><meta name=theme-color content="#2e2e33"><meta name=msapplication-TileColor content="#2e2e33"><noscript><style>#theme-toggle,.top-link{display:none}</style><style>@media(prefers-color-scheme:dark){:root{--theme:rgb(29, 30, 32);--entry:rgb(46, 46, 51);--primary:rgb(218, 218, 219);--secondary:rgb(155, 156, 157);--tertiary:rgb(65, 66, 68);--content:rgb(196, 196, 197);--hljs-bg:rgb(46, 46, 51);--code-bg:rgb(55, 56, 62);--border:rgb(51, 51, 51)}.list{background:var(--theme)}.list:not(.dark)::-webkit-scrollbar-track{background:0 0}.list:not(.dark)::-webkit-scrollbar-thumb{border-color:var(--theme)}}</style></noscript><meta property="og:title" content="Scrapping contracts"><meta property="og:description" content="I describe a way to simplify the generics design. The ideas are not particularly novel and have been expressed to various degrees by other people as well. I hope to provide a more complete view of the design though."><meta property="og:type" content="article"><meta property="og:url" content="https://blog.merovius.de/posts/2018-09-05-scrapping_contracts/"><meta property="article:section" content="posts"><meta property="article:published_time" content="2018-09-05T04:00:00+00:00"><meta property="article:modified_time" content="2018-09-05T04:00:00+00:00"><meta name=twitter:card content="summary"><meta name=twitter:title content="Scrapping contracts"><meta name=twitter:description content="I describe a way to simplify the generics design. The ideas are not particularly novel and have been expressed to various degrees by other people as well. I hope to provide a more complete view of the design though."><script type=application/ld+json>{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Posts","item":"https://blog.merovius.de/posts/"},{"@type":"ListItem","position":2,"name":"Scrapping contracts","item":"https://blog.merovius.de/posts/2018-09-05-scrapping_contracts/"}]}</script><script type=application/ld+json>{"@context":"https://schema.org","@type":"BlogPosting","headline":"Scrapping contracts","name":"Scrapping contracts","description":"I describe a way to simplify the generics design. The ideas are not particularly novel and have been expressed to various degrees by other people as well. I hope to provide a more complete view of the design though.","keywords":["golang","programming"],"articleBody":"tl;dr: I describe a way to simplify the generics design. The ideas are not particularly novel and have been expressed to various degrees by other people as well. I hope to provide a more complete view of the design though.\nRecently a Problem Overview and Draft Design for generics in Go have dropped. Since then, predictably, there has been a bunch of chatter on the intertubez about it. This is a summary of my thoughts, so far, on the subject - after a bunch of discussions on Twitter and Reddit.\nNote: The design is called “Contracts”, but I will refer to it as “the design doc” here. When I say “contracts”, I will refer to the specific part of the design to express constraints.\nContracts vs. Interfaces First, there is a common observation of overlap between generics and interfaces. To untangle that, we can say that when we use “generics”, what we mean is constrained parametric polymorphism. Go already allows polymorphism by using interfaces. This desgn doc adds two things: One, a way to add type-parameters to functions and types. And two, a syntax to constrain those type-parameters to a subset that allows specific operations, via contracts.\nThe latter is where the overlap lies: Interfaces already allow you to constrain arguments to types that allow certain operations. In a way, what contracts add to this, is that those operations can not only be method calls, but also allow (and constrain) builtin operators and functions to be used and to allow or disallow certain composite types (though that mainly affects map).\nContracts allow that by the way they are specified: You write a function body (including arguments, whose notational type becomes the type-variable of the contract) containing all the statements/expressions you wish to be able to do. When instantiating a generic type/function with a given set of type-arguments, the compiler will try to substitute the corresponding type-variable in the contract body and allow the instantiation, if that body type-checks.\nThe cost of contracts After talking a bit through some examples, I feel that contracts optimize for the wrong thing. The analogy I came up with is vocabulary vs. grammar.\nThe contracts design is appealing to a good degree, because it uses familiar syntax: You don’t have to learn any new syntax or language to express your contract. Just write natural Go code and have that express your constraints for you. I call this the “grammar” of constraints: The structure that you use to input them.\nOn the other hand, for the user of Go, the relevant question is what constraints are possible to express and how to express them. They might be interested in deduplicating values in their algorithm, which requires equality-operations. Or they might want to do comparisons (e.g. Max), which requires . I call this the vocabulary: What is the correct way to express the set of constraints that my algorithm needs?\nThe issue now, is that while the grammar of constraints might be obvious, it is not always clear what the actual semantic constraints that generates are. A simple example is map-keys. The design doc uses the contract\ncontract comparable (t T) { t == t } to specify types that are valid map-keyes. But to a beginner, it is not immediately obvious, what comparisons have to do with maps. An alternative would be\ncontract mapkey (t T) { var _ map[t]bool } But which is better? Similarly, these two contracts\ncontract mult (t T) { t = t * t } contract add (t T) { t = t + t } seem very similar, but they are, in theory at least, fundamentally different. Not only because add allows string, while mult doesn’t. But also, because technically any type that supports * also supports - and /. And then there’s\ncontract div (t T) { t = t % t } which creates another completely different set of types and allowed operators.\nA third example is\ncontract stringlike (t T) { append([]byte(nil), t...) } This allows any type with underlying type string or []byte, but nothing else. And again, technically that would imply allowing index-operations and len. But does the compiler understand that?\nLastly, it’s not really clear how len, cap, make or range would work. For example, all these contracts are superficially valid:\ncontract rangeable (t T) { for x := range t { fmt.Println(x) } } contract lengthed (t T) { var _ int = len(t) } contract capped (t T) { var _ int = cap(t) } contract makeable (t T) { t = make(T) } contract makeable2 (t T) { t = make(T, 0) } But in all these cases, they allow some subset of channel, map, slice and array types, with vastly different interpretations of these operations, depending on the kind of type used - to the degree, that code using them would usually be nonsensical. Disallowing these, however, opens questions about the claim of familiar Go syntax, as we now have to make decisions what sort of expressions and statements we do or don’t allow in a contract.\nThis is why I say contracts optimize for grammar, instead of vocabulary. The programmer is interested in the vocabulary - what does the contract actually mean and what contract should they use? But the vocabulary is obscured by the grammar - because we use Go syntax, to understand a given contract we need to know a bunch of things about what the compiler is and is not able to infer from it.\nThis is why I don’t really buy the argument of not wanting to learn a bunch of new syntax or new identifiers for constraints: You still have to learn that vocabulary, but you express it in an obscure and unnatural grammar. I hope to show that we can introduce the power of generics while also using familiar grammar and with minimal addition of vocabulary.\nScrapping contracts Now, I’m not the first person to suggest this, but I think we should consider scrapping contracts from the design. We can still retain type-parameters and we can still have constraints, but we express them via interfaces instead. I should point out, that - for now - I’m intentionally optimizing for simplicity of the design, at the cost of some boilerplate and some loss of power. I will later try and provide some alternatives to compensate for that in part. But there is still likely going to remain a net cost in expressiveness. Personally, I think that tradeoff is worth exploring.\nThe new design would retain type-parameters and most of their syntax. The difference is that type-parameters are a full argument list. The type of an argument has to be an interface type. It can be ellided, in which case it defaults to the type of the following type-parameter. The last type-parameter defaults to interface{}. As a bonus, this allows providing multiple sets of constraints on one declaration:\nfunc Map(type A, B) (s []A, f func(A) B) []B { var out []B for _, a := range s { out = f(a) } return out } func Stringify(type A fmt.Stringer) (s []A) []string { // Because of the signature of fmt.Stringer.String, we can infer all the // type-arguments here. Note that A does not *have* to be passed boxed in an // interface. A.String is still a valid method-expression for any fmt.Stringer. return Map(s, A.String) } We still want to be able to express multiple, interdependent parameters, which we can, via parametric interfaces:\ntype Graph(type Node, Edge) interface { Nodes(Edge) []Node Edges(Node) []Edge } func ShortestPath(type Node, Edge) (g Graph(Node, Edge), from, to Node) []Edge { // … } // Undirected Graph as an adjacency list. This could be further parameterized, // to allow for user-defined paylooads. type AdjacencyList [][]int func (g AdjacencyList) Nodes(edge [2]int) []int { return edge[:] } func (g AdjacencyList) Edges(node int) [][2]int { var out [][2]int for _, v := range g[node] { out = append(out, [2]int{node, v} if v != node { out = append(out, [2]int{v, node}) } } return out } func main() { g := AdjacencyList{…} // Types could be infered here, as the names of methods are unique, so we can // look at the methods Nodes and Edges of AdjacencyList to infer the // type-arguments. path := ShortestPath(g, 0, len(g)-1) fmt.Println(path) } The last example is relevant to the difference in power between contracts and interfaces: Usage of operators. We can still express the concept, but this is where the increased boilerplate comes in:\nfunc Max(type T)(a, b T, less func(T, T) bool) T { if less(a, b) { return b } return a } func main() { fmt.Println(Max(a, b int, func(a, b int) { return a I will try to show some ways to get rid of that boilerplate later. For now, let’s just treat it as a necessary evil of this idea. Though it should be mentioned, that while this is more cumbersome, it’s still just as typesafe as contracts (as opposed to, say, a reflect-based generic Max).\nSo, scrapping contracts leaves us with more boilerplate, but just the same set of concepts we can express - though we do have to pass in any builtin operations we want to perform as extra functions (or express them in an interface). In exchange, we get\n Only one way to specify constraints. A simpler spec (we don’t need to add a new concept, contracts, to the language) and a saved (pseudo-)keyword. A simpler compiler: We don’t need to add a solver to deduce constraints from a given contract. The constraint-checker already exists. Still a well-known, though less powerfull, language to express constraints, with interfaces. Simple syntax (same as normal arglists) for having multiple sets of constraints in one declaration. Trivially good error messages. Types passed in need only be checked for consistency and interface satisfaction - the latter is already implemented, including good error messages.  Getting rid of boilerplate I see two main ways to get rid of boilerplate: Adding methods to builtin types, or what I call pseudo-interfaces.\nMethods on builtin types An obvious idea is to not use operators in generic code, but instead use method-call syntax. That is, we’d do something akin to\nfunc Max(type T Ordered) (a, b T) T { if a.Less(b) { return b } return a } To actually reduce the boilerplate, we’d predefine methods for all the operators on the builtin types. That would allow us to call Max with int, for example.\nUnfortunately, I can see a bunch of roadblocks to make this work. Methods are not promoted to derived types, so you couldn’t use Max with e.g. time.Duration, which has underlying type int64, but is not the same type. We’d probably want those methods to be “special” in that they automatically get promoted to any type whose underlying type is predeclared. That introduces compatibility issues of clashing Method/Field names.\nAt the end, to express that Less has to take the same argument as the receiver type, Ordered might look something like this:\ntype Ordered(T) interface {  Less(T) bool }  func Max(type T Ordered(T)) (a, b T) T {  if a.Less(b) {  return b  }  return a }  // In the universe block:  // Implements Ordered(int). func (a int) Less(b int) bool {  retun a b } Though it’s not clear, whether a parameter like T Ordered(T) should be allowed. And this would technically allow to implement Ordered(int) on a custom type. While that probably won’t be very useful (the majority of usecases will require T Ordered(T)), it’s not excluded.\nPseudo-interfaces Unfortunately I didn’t have a lot of time the last couple of days, so I got beat to the punch on this. Matt Sherman described the idea first and called the concept “typeclasses”. I will stick with pseudo-interface, because it fits better in the general concept of this description.\nThe idea is to introduce a set of types into the language that can be used like interfaces (including embedding), but instead of providing methods, provide operators. There is a limited set of base types that need to be provided:\npseudo-interface | Allowed operators -----------------+------------------- comparable | ==, != ordered | = boolean | ||, \u0026\u0026, ! bitwise | ^, %, \u0026, \u0026^,  arith | +, -, *, / concat | + complex | real(z), imag(z) nilable | v == nil and a set of derived pseudo-interfaces:\npseudo-interface | definition -----------------+----------------------------------------------------- num | interface { comparable; ordered; arith } integral | interface { num; bitwise } stringy | interface { comparable; ordered; concat; len() int } iface | interface { comparable; nilable } The pseudo-interfaces would be declared in the universe block, as predeclared identifiers. This makes them backwards-compatible (as opposed to methods on builtin types), because any existing identifier would just shadow these (akin to how you can have a variable with name string).\nBitshift-operators currently are restricted when used with constants overflowing the width of an integral type. For generic code, this restriction would be lifted (as the size is not statically known) and instead the behavior is equivalent to if the right operand is an uint variable with the given value.\nThis would allow us to write\nfunc Max(type T ordered) (a, b T) T { if a Notably, the list of pseudo-interfaces doesn’t include anything related to channel-, slice- or map-operations (or other composite types). The idea is to instead use a type literal directly:\ntype Keys(type K, V) (m map[K]V) []K { var out []K for k := range m { out = append(out, k) } return out } As every type supporting, e.g. map operations, need to have underlying type map[K]V, it’s thus assignable to that type and can be passed to Keys as is. That is, this is completely legal:\nfunc main() { type MyMap map[string]int var m = MyMap{ \"foo\": 23, \"bar\": 42, } fmt.Println(Keys(m)) } This also solves another problem with contracts: The ambiguity of len, cap and range. As the actual kind of the value is not only known during compilation of the generic function, but even obvious from the code, there is no question about the intended semantics.\nShould Go ever grow operator overloading via operator methods, the pseudo-interfaces could be changed into actual interfaces, containing the necessary methods. Of course, that implies that operator overloading would retain the properties of existing operators, e.g. that having == implies having !=, or having - implying having +. Personally, I consider that a good thing - it limits the abuse of operator overloading for nonsensical operations (say,  for writing to an io.Writer).\nI’m not trying to advocate for operator overloading, but think it’s worth mentioning that this design leaves the door open to that.\nBut performance A possible criticism of either of these approaches is, that operators have better performance than dynamic dispatch to a method. I believe (vigorous handwaving ahead) that this is no different in the existing contracts proposal. If generic code is compiled generically, it still needs to employ some means of dynamic dispatch for operators. If, on the other hand, it’s compiled instantiated, then the compiler would also be able to devirtualize the interfaces - and then inline the method definition.\nConclusion I’ve previously said that I’m “meh” on the design doc, which is the strongest form of endorsement a generics proposal could ever get from me. After some discussion, I’m more and more convinced that while contracts seem conceptually simple, they create a plethora of implementation- and usage questions. I’m not sure, the supposed advantage of contracts, of a well-known syntax, holds up to scrutiny when it comes to mapping that to the actually derived constraints or writing contracts. There are also many open questions in regards to contracts, a bunch of them related to the ambiguity of Go-expressions. As a result, I’m starting to feel more negative towards them - they look like an elegant idea, but in practice, they have a lot of weird corners.\nThis design is similar (AIUI) to the type functions proposal, so I assume there are good reasons the Go team does not want this. The difference is mainly the absence of operator methods in favor of pseudo-interfaces or explicit method calls. This design also handwaves a couple of important implementation questions - the justification for that is that these questions (e.g. type inference and code generation) should be able to be taken from the design doc with minimal changes. It’s entirely possible that I am overlooking something, though.\n","wordCount":"2762","inLanguage":"en","datePublished":"2018-09-05T04:00:00Z","dateModified":"2018-09-05T04:00:00Z","mainEntityOfPage":{"@type":"WebPage","@id":"https://blog.merovius.de/posts/2018-09-05-scrapping_contracts/"},"publisher":{"@type":"Organization","name":"Mero's Blog","logo":{"@type":"ImageObject","url":"https://blog.merovius.de/favicon.ico"}}}</script></head><body id=top><script>localStorage.getItem("pref-theme")==="dark"?document.body.classList.add("dark"):localStorage.getItem("pref-theme")==="light"?document.body.classList.remove("dark"):window.matchMedia("(prefers-color-scheme: dark)").matches&&document.body.classList.add("dark")</script><header class=header><nav class=nav><div class=logo><a href=https://blog.merovius.de/ accesskey=h title="Mero's Blog (Alt + H)">Mero's Blog</a>
+<span class=logo-switches><button id=theme-toggle accesskey=t title="(Alt + T)"><svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg><svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button></span></div><ul id=menu></ul></nav></header><main class=main><article class=post-single><header class=post-header><h1 class=post-title>Scrapping contracts</h1><div class=post-meta><span title="2018-09-05 04:00:00 +0000 UTC">September 5, 2018</span></div></header><div class=post-content><p><strong>tl;dr: I describe a way to simplify the generics design. The ideas are not
+particularly novel and have been expressed to various degrees by other people
+as well. I hope to provide a more complete view of the design though.</strong></p><p>Recently a <a href=https://go.googlesource.com/proposal/+/master/design/go2draft-generics-overview.md>Problem Overview</a>
+and <a href=https://go.googlesource.com/proposal/+/master/design/go2draft-contracts.md>Draft Design</a>
+for generics in Go have dropped. Since then, predictably,
+there has been a bunch of chatter on the intertubez about it. This is a
+summary of my thoughts, so far, on the subject - after a bunch of discussions
+on Twitter and Reddit.</p><p>Note: The design is called &ldquo;Contracts&rdquo;, but I will refer to it as &ldquo;the design
+doc&rdquo; here. When I say &ldquo;contracts&rdquo;, I will refer to the specific part of the
+design to express constraints.</p><h2 id=contracts-vs-interfaces>Contracts vs. Interfaces<a hidden class=anchor aria-hidden=true href=#contracts-vs-interfaces>#</a></h2><p>First, there is a common observation of overlap between generics and interfaces.
+To untangle that, we can say that when we use &ldquo;generics&rdquo;, what we mean is
+<em>constrained parametric polymorphism</em>. Go already allows polymorphism by using
+interfaces. This desgn doc adds two things: One, a way to add <em>type-parameters</em> to
+functions and types. And two, a syntax to constrain those type-parameters to a
+subset that allows specific operations, via <em>contracts</em>.</p><p>The latter is where the overlap lies: Interfaces <em>already</em> allow you to
+constrain arguments to types that allow certain operations. In a way, what
+contracts add to this, is that those operations can not only be method calls,
+but also allow (and constrain) builtin operators and functions to be used and
+to allow or disallow certain composite types (though that mainly affects <code>map</code>).</p><p>Contracts allow that by the way they are specified: You write a function body
+(including arguments, whose notational type becomes the type-variable of the
+contract) containing all the statements/expressions you wish to be able
+to do. When instantiating a generic type/function with a given set of
+type-arguments, the compiler will try to substitute the corresponding
+type-variable in the contract body and allow the instantiation, if that body
+type-checks.</p><h2 id=the-cost-of-contracts>The cost of contracts<a hidden class=anchor aria-hidden=true href=#the-cost-of-contracts>#</a></h2><p>After talking a bit through some examples, I feel that contracts optimize for
+the wrong thing. The analogy I came up with is vocabulary vs. grammar.</p><p>The contracts design is appealing to a good degree, because it uses familiar
+<em>syntax</em>: You don&rsquo;t have to learn any new syntax or language to express your
+contract. Just write natural Go code and have that express your constraints for
+you. I call this the &ldquo;grammar&rdquo; of constraints: The structure that you use to
+input them.</p><p>On the other hand, for the <em>user</em> of Go, the relevant question is what
+constraints are possible to express and how to express them. They might be
+interested in deduplicating values in their algorithm, which requires
+equality-operations. Or they might want to do comparisons (e.g. <code>Max</code>), which
+requires <code>></code>. I call this the <em>vocabulary</em>: What is the correct way to express
+the set of constraints that my algorithm needs?</p><p>The issue now, is that while the grammar of constraints might be obvious, it is
+not always clear what the actual semantic constraints that generates <em>are</em>. A
+simple example is map-keys. The design doc uses the contract</p><pre tabindex=0><code>contract comparable (t T) {
+   t == t
+}
+</code></pre><p>to specify types that are valid map-keyes. But to a beginner, it is not
+immediately obvious, what comparisons have to do with maps. An alternative
+would be</p><pre tabindex=0><code>contract mapkey (t T) {
+  var _ map[t]bool
+}
+</code></pre><p>But which is better? Similarly, these two contracts</p><pre tabindex=0><code>contract mult (t T) {
+  t = t * t
+}
+
+contract add (t T) {
+  t = t + t
+}
+</code></pre><p>seem very similar, but they are, in theory at least, fundamentally different.
+Not only because <code>add</code> allows <code>string</code>, while <code>mult</code> doesn&rsquo;t. But also, because
+<em>technically</em> any type that supports <code>*</code> also supports <code>-</code> and <code>/</code>. And then there&rsquo;s</p><pre tabindex=0><code>contract div (t T) {
+  t = t % t
+}
+</code></pre><p>which creates another completely different set of types and allowed operators.</p><p>A third example is</p><pre tabindex=0><code>contract stringlike (t T) {
+  append([]byte(nil), t...)
+}
+</code></pre><p>This allows any type with underlying type <code>string</code> or <code>[]byte</code>, but nothing
+else. And again, technically that would imply allowing index-operations and
+<code>len</code>. But does the compiler understand that?</p><p>Lastly, it&rsquo;s not really clear how <code>len</code>, <code>cap</code>, <code>make</code> or <code>range</code> would work.
+For example, all these contracts are superficially valid:</p><pre tabindex=0><code>contract rangeable (t T) {
+  for x := range t {
+    fmt.Println(x)
+  }
+}
+
+contract lengthed (t T) {
+  var _ int = len(t)
+}
+
+contract capped (t T) {
+  var _ int = cap(t)
+}
+
+contract makeable (t T) {
+  t = make(T)
+}
+
+contract makeable2 (t T) {
+  t = make(T, 0)
+}
+</code></pre><p>But in all these cases, they allow some subset of channel, map, slice and array
+types, with vastly different interpretations of these operations, depending on
+the kind of type used - to the degree, that code using them would usually be
+nonsensical. Disallowing these, however, opens questions about the claim of
+familiar Go syntax, as we now have to make decisions what sort of expressions
+and statements we do or don&rsquo;t allow in a contract.</p><p>This is why I say contracts optimize for grammar, instead of vocabulary. The
+programmer is interested in the vocabulary - what does the contract actually
+<em>mean</em> and what contract should they use? But the vocabulary is obscured by the
+grammar - because we use Go syntax, to understand a given contract we need to
+know a bunch of things about what the compiler is and is not able to infer from
+it.</p><p>This is why I don&rsquo;t really buy the argument of not wanting to learn a bunch of
+new syntax or new identifiers for constraints: You <em>still</em> have to learn that
+vocabulary, but you express it in an obscure and unnatural grammar. I hope to
+show that we can introduce the power of generics while also using familiar
+grammar and with minimal addition of vocabulary.</p><h2 id=scrapping-contracts>Scrapping contracts<a hidden class=anchor aria-hidden=true href=#scrapping-contracts>#</a></h2><p>Now, I&rsquo;m not the first person to suggest this, but I think we should consider
+scrapping contracts from the design. We can still retain type-parameters and we
+can still have constraints, but we express them via interfaces instead. I
+should point out, that - for now - I&rsquo;m intentionally optimizing for simplicity
+of the design, at the cost of some boilerplate and some loss of power. I will
+later try and provide some alternatives to compensate for that in part. But
+there is still likely going to remain a net cost in expressiveness. Personally,
+I think that tradeoff is worth exploring.</p><p>The new design would retain type-parameters and most of their syntax. The
+difference is that type-parameters are a full argument list. The type of an
+argument has to be an interface type. It can be ellided, in which case it
+defaults to the type of the following type-parameter. The last type-parameter
+defaults to <code>interface{}</code>. As a bonus, this allows providing multiple sets of
+constraints on one declaration:</p><pre tabindex=0><code>func Map(type A, B) (s []A, f func(A) B) []B {
+  var out []B
+  for _, a := range s {
+    out = f(a)
+  }
+  return out
+}
+
+func Stringify(type A fmt.Stringer) (s []A) []string {
+  // Because of the signature of fmt.Stringer.String, we can infer all the
+  // type-arguments here. Note that A does not *have* to be passed boxed in an
+  // interface. A.String is still a valid method-expression for any fmt.Stringer.
+  return Map(s, A.String)
+}
+</code></pre><p>We still want to be able to express multiple, interdependent parameters, which
+we can, via parametric interfaces:</p><pre tabindex=0><code>type Graph(type Node, Edge) interface {
+  Nodes(Edge) []Node
+  Edges(Node) []Edge
+}
+
+func ShortestPath(type Node, Edge) (g Graph(Node, Edge), from, to Node) []Edge {
+  // …
+}
+
+// Undirected Graph as an adjacency list. This could be further parameterized,
+// to allow for user-defined paylooads.
+type AdjacencyList [][]int
+
+func (g AdjacencyList) Nodes(edge [2]int) []int {
+  return edge[:]
+}
+
+func (g AdjacencyList) Edges(node int) [][2]int {
+  var out [][2]int
+  for _, v := range g[node] {
+    out = append(out, [2]int{node, v}
+    if v != node {
+      out = append(out, [2]int{v, node})
+    }
+  }
+  return out
+}
+
+func main() {
+  g := AdjacencyList{…}
+  // Types could be infered here, as the names of methods are unique, so we can
+  // look at the methods Nodes and Edges of AdjacencyList to infer the
+  // type-arguments.
+  path := ShortestPath(g, 0, len(g)-1)
+  fmt.Println(path)
+}
+</code></pre><p>The last example is relevant to the difference in power between contracts and
+interfaces: Usage of operators. We can still express the concept, but this is
+where the increased boilerplate comes in:</p><pre tabindex=0><code>func Max(type T)(a, b T, less func(T, T) bool) T {
+  if less(a, b) {
+    return b
+  }
+  return a
+}
+
+func main() {
+  fmt.Println(Max(a, b int, func(a, b int) { return a &lt; b }))
+}
+</code></pre><p>I will try to show some ways to get rid of that boilerplate later. For now,
+let&rsquo;s just treat it as a necessary evil of this idea. Though it should be
+mentioned, that while this is more <em>cumbersome</em>, it&rsquo;s still just as <em>typesafe</em>
+as contracts (as opposed to, say, a reflect-based generic <code>Max</code>).</p><p>So, scrapping contracts leaves us with more boilerplate, but just the same set
+of concepts we can express - though we do have to pass in any builtin
+operations we want to perform as extra functions (or express them in an
+interface). In exchange, we get</p><ul><li>Only one way to specify constraints.</li><li>A simpler spec (we don&rsquo;t need to add a new concept, contracts, to the
+language) and a saved (pseudo-)keyword.</li><li>A simpler compiler: We don&rsquo;t need to add a solver to deduce constraints from
+a given contract. The constraint-checker already exists.</li><li>Still a well-known, though less powerfull, language to express constraints,
+with interfaces.</li><li>Simple syntax (same as normal arglists) for having multiple sets of
+constraints in one declaration.</li><li>Trivially good error messages. Types passed in need only be checked for
+consistency and interface satisfaction - the latter is already implemented,
+including good error messages.</li></ul><h2 id=getting-rid-of-boilerplate>Getting rid of boilerplate<a hidden class=anchor aria-hidden=true href=#getting-rid-of-boilerplate>#</a></h2><p>I see two main ways to get rid of boilerplate: Adding methods to builtin types,
+or what I call pseudo-interfaces.</p><h3 id=methods-on-builtin-types>Methods on builtin types<a hidden class=anchor aria-hidden=true href=#methods-on-builtin-types>#</a></h3><p>An obvious idea is to not use operators in generic code, but instead use
+method-call syntax. That is, we&rsquo;d do something akin to</p><pre tabindex=0><code>func Max(type T Ordered) (a, b T) T {
+  if a.Less(b) {
+    return b
+  }
+  return a
+}
+</code></pre><p>To actually reduce the boilerplate, we&rsquo;d predefine methods for all the
+operators on the builtin types. That would allow us to call <code>Max</code> with <code>int</code>,
+for example.</p><p>Unfortunately, I can see a bunch of roadblocks to make this work. Methods are
+not promoted to derived types, so you couldn&rsquo;t use <code>Max</code> with e.g.
+<code>time.Duration</code>, which has <em>underlying</em> type <code>int64</code>, but is not the same type.
+We&rsquo;d probably want those methods to be &ldquo;special&rdquo; in that they automatically get
+promoted to any type whose underlying type is predeclared. That introduces
+compatibility issues of clashing Method/Field names.</p><p>At the end, to express that <code>Less</code> has to take the same argument as the
+receiver type, <code>Ordered</code> might look something like this:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>Ordered</span>(<span style=color:#a6e22e>T</span>) <span style=color:#66d9ef>interface</span> {
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>Less</span>(<span style=color:#a6e22e>T</span>) <span style=color:#66d9ef>bool</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>Max</span>(<span style=color:#66d9ef>type</span> <span style=color:#a6e22e>T</span> <span style=color:#a6e22e>Ordered</span>(<span style=color:#a6e22e>T</span>)) (<span style=color:#a6e22e>a</span>, <span style=color:#a6e22e>b</span> <span style=color:#a6e22e>T</span>) <span style=color:#a6e22e>T</span> {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>a</span>.<span style=color:#a6e22e>Less</span>(<span style=color:#a6e22e>b</span>) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> <span style=color:#a6e22e>b</span>
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>return</span> <span style=color:#a6e22e>a</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// In the universe block:
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// Implements Ordered(int).
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> (<span style=color:#a6e22e>a</span> <span style=color:#66d9ef>int</span>) <span style=color:#a6e22e>Less</span>(<span style=color:#a6e22e>b</span> <span style=color:#66d9ef>int</span>) <span style=color:#66d9ef>bool</span> {
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>retun</span> <span style=color:#a6e22e>a</span> &lt; <span style=color:#a6e22e>b</span>
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p>Though it&rsquo;s not clear, whether a parameter like <code>T Ordered(T)</code> should be
+allowed. And this would technically allow to implement <code>Ordered(int)</code> on a
+custom type. While that probably won&rsquo;t be very useful (the majority of usecases
+will require <code>T Ordered(T)</code>), it&rsquo;s not excluded.</p><h3 id=pseudo-interfaces>Pseudo-interfaces<a hidden class=anchor aria-hidden=true href=#pseudo-interfaces>#</a></h3><p>Unfortunately I didn&rsquo;t have a lot of time the last couple of days, so I got
+beat to the punch on this. Matt Sherman <a href=https://clipperhouse.com/go-generics-typeclasses/>described the idea first</a>
+and called the concept &ldquo;typeclasses&rdquo;. I will stick with pseudo-interface,
+because it fits better in the general concept of this description.</p><p>The idea is to introduce a set of types into the language that can be used like
+interfaces (including embedding), but instead of providing methods, provide
+operators. There is a limited set of base types that need to be provided:</p><pre tabindex=0><code>pseudo-interface | Allowed operators
+-----------------+-------------------
+comparable       | ==, !=
+ordered          | &lt;, &lt;= &gt; &gt;=
+boolean          | ||, &amp;&amp;, !
+bitwise          | ^, %, &amp;, &amp;^, &lt;&lt;, &gt;&gt;
+arith            | +, -, *, /
+concat           | +
+complex          | real(z), imag(z)
+nilable          | v == nil
+</code></pre><p>and a set of derived pseudo-interfaces:</p><pre tabindex=0><code>pseudo-interface | definition
+-----------------+-----------------------------------------------------
+num              | interface { comparable; ordered; arith }
+integral         | interface { num; bitwise }
+stringy          | interface { comparable; ordered; concat; len() int }
+iface            | interface { comparable; nilable }
+</code></pre><p>The pseudo-interfaces would be declared in the universe block, as predeclared
+identifiers. This makes them backwards-compatible (as opposed to methods on
+builtin types), because any existing identifier would just shadow these (akin
+to how you can have a variable with name <code>string</code>).</p><p>Bitshift-operators currently are restricted when used with constants
+overflowing the width of an integral type. For generic code, this restriction
+would be lifted (as the size is not statically known) and instead the behavior
+is equivalent to if the right operand is an uint variable with the given
+value.</p><p>This would allow us to write</p><pre tabindex=0><code>func Max(type T ordered) (a, b T) T {
+  if a &lt; b {
+    return b
+  }
+  return a
+}
+</code></pre><p>Notably, the list of pseudo-interfaces doesn&rsquo;t include anything related to
+channel-, slice- or map-operations (or other composite types). The idea is to
+instead use a type literal directly:</p><pre tabindex=0><code>type Keys(type K, V) (m map[K]V) []K {
+  var out []K
+  for k := range m {
+    out = append(out, k)
+  }
+  return out
+}
+</code></pre><p>As every type supporting, e.g. <code>map</code> operations, need to have underlying type
+<code>map[K]V</code>, it&rsquo;s thus assignable to that type and can be passed to <code>Keys</code> as is.
+That is, this is completely legal:</p><pre tabindex=0><code>func main() {
+  type MyMap map[string]int
+  var m = MyMap{
+    &#34;foo&#34;: 23,
+    &#34;bar&#34;: 42,
+  }
+  fmt.Println(Keys(m))
+}
+</code></pre><p>This also solves another problem with contracts: The ambiguity of <code>len</code>, <code>cap</code>
+and <code>range</code>. As the actual kind of the value is not only known during
+compilation of the generic function, but even obvious from the code, there is
+no question about the intended semantics.</p><p>Should Go ever grow operator overloading via operator methods, the
+pseudo-interfaces could be changed into actual interfaces, containing the
+necessary methods. Of course, that implies that operator overloading would
+retain the properties of existing operators, e.g. that having <code>==</code> implies
+having <code>!=</code>, or having <code>-</code> implying having <code>+</code>. Personally, I consider that a
+good thing - it limits the abuse of operator overloading for nonsensical
+operations (say, <code>&lt;&lt;</code> for writing to an <code>io.Writer</code>).</p><p>I&rsquo;m not trying to advocate for operator overloading, but think it&rsquo;s worth
+mentioning that this design leaves the door open to that.</p><h3 id=but-performance>But performance<a hidden class=anchor aria-hidden=true href=#but-performance>#</a></h3><p>A possible criticism of either of these approaches is, that operators have
+better performance than dynamic dispatch to a method. I believe (vigorous
+handwaving ahead) that this is no different in the existing contracts proposal.
+If generic code is compiled generically, it still needs to employ some means
+of dynamic dispatch for operators. If, on the other hand, it&rsquo;s compiled
+instantiated, then the compiler would also be able to devirtualize the
+interfaces - and then inline the method definition.</p><h2 id=conclusion>Conclusion<a hidden class=anchor aria-hidden=true href=#conclusion>#</a></h2><p>I&rsquo;ve previously said that I&rsquo;m &ldquo;meh&rdquo; on the design doc, which is the strongest
+form of endorsement a generics proposal could ever get from me. After some
+discussion, I&rsquo;m more and more convinced that while contracts <em>seem</em>
+conceptually simple, they create a plethora of implementation- and usage
+questions. I&rsquo;m not sure, the supposed advantage of contracts, of a well-known
+syntax, holds up to scrutiny when it comes to mapping that to the actually
+derived constraints or writing contracts. There are also many open questions in
+regards to contracts, a bunch of them related to the ambiguity of
+Go-expressions. As a result, I&rsquo;m starting to feel more negative towards them -
+they <em>look</em> like an elegant idea, but in practice, they have a lot of weird
+corners.</p><p>This design is similar (AIUI) to the <a href=https://go.googlesource.com/proposal/+/master/design/15292/2010-06-type-functions.md>type functions</a>
+proposal, so I assume there are good reasons the Go team does not want this.
+The difference is mainly the absence of operator methods in favor of
+pseudo-interfaces or explicit method calls. This design also handwaves a
+couple of important implementation questions - the justification for that is
+that these questions (e.g. type inference and code generation) should be able
+to be taken from the design doc with minimal changes. It&rsquo;s entirely
+possible that I am overlooking something, though.</p></div><footer class=post-footer><ul class=post-tags><li><a href=https://blog.merovius.de/tags/golang/>golang</a></li><li><a href=https://blog.merovius.de/tags/programming/>programming</a></li></ul></footer></article></main><footer class=footer><span>&copy; 2022 <a href=https://blog.merovius.de/>Mero's Blog</a></span>
+<span>Powered by
+<a href=https://gohugo.io/ rel="noopener noreferrer" target=_blank>Hugo</a> &
+        <a href=https://git.io/hugopapermod rel=noopener target=_blank>PaperMod</a></span></footer><a href=#top aria-label="go to top" title="Go to Top (Alt + G)" class=top-link id=top-link accesskey=g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentcolor"><path d="M12 6H0l6-6z"/></svg></a><script>let menu=document.getElementById("menu");menu&&(menu.scrollLeft=localStorage.getItem("menu-scroll-position"),menu.onscroll=function(){localStorage.setItem("menu-scroll-position",menu.scrollLeft)}),document.querySelectorAll('a[href^="#"]').forEach(e=>{e.addEventListener("click",function(t){t.preventDefault();var e=this.getAttribute("href").substr(1);window.matchMedia("(prefers-reduced-motion: reduce)").matches?document.querySelector(`[id='${decodeURIComponent(e)}']`).scrollIntoView():document.querySelector(`[id='${decodeURIComponent(e)}']`).scrollIntoView({behavior:"smooth"}),e==="top"?history.replaceState(null,null," "):history.pushState(null,null,`#${e}`)})})</script><script>var mybutton=document.getElementById("top-link");window.onscroll=function(){document.body.scrollTop>800||document.documentElement.scrollTop>800?(mybutton.style.visibility="visible",mybutton.style.opacity="1"):(mybutton.style.visibility="hidden",mybutton.style.opacity="0")}</script><script>document.getElementById("theme-toggle").addEventListener("click",()=>{document.body.className.includes("dark")?(document.body.classList.remove("dark"),localStorage.setItem("pref-theme","light")):(document.body.classList.add("dark"),localStorage.setItem("pref-theme","dark"))})</script></body></html>

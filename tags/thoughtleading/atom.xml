@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">in thoughtleading on Mero's Blog</title><link href="https://blog.merovius.de/tags/thoughtleading/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/thoughtleading/atom.xml"/><updated>2022-04-06T09:07:18+00:00</updated><id>https://blog.merovius.de/tags/thoughtleading/</id><author><name>Axel Wagner</name></author><entry><title type="html">What even is error handling?</title><link href="https://blog.merovius.de/posts/2018-01-21-what_even_is_error_handling/" rel="alternate" type="text/html"/><id>https://blog.merovius.de//2018/01/21/what_even_is_error_handling.html</id><published>2018-01-21T23:40:00+00:00</published><updated>2018-01-21T23:40:00+00:00</updated><content type="html"><![CDATA[<p><strong>tl;dr: Error handling shouldn&rsquo;t be about how to best propagate an error
+value, but how to make it destroy it (or make it irrelevant). To encourage
+myself to do that, I started removing errors from function returns wherever I
+found it at all feasible</strong></p>
+<p>Error handling in Go is a contentious and often criticized issue. There is no
+shortage on articles criticizing the approach taken, no shortage on articles
+giving advice on how to deal with it (or defending it) and also no shortage on
+proposals on how to improve it.</p>
+<p>During these discussion, I always feel there is something missing. The
+proposals for improvement usually deal with syntactical issues, how to avoid
+boilerplate. Then there is the other school of thought - where it&rsquo;s not about
+syntax, but about how to best pass errors around. Dave Chaney wrote <a href="https://dave.cheney.net/2016/04/27/dont-just-check-errors-handle-them-gracefully">an often
+quoted blog post on the
+subject</a>,
+where he lists all the ways error information can be mapped into the Go type
+system, why he considers them flawed and what he suggests instead.
+This school of thought regularly comes up with helper packages, to make
+wrapping or annotating errors easier.
+<a href="https://github.com/pkg/errors">pkg/errors</a> is very popular (and is grown out
+of the approach of above blog post) but <a href="https://godoc.org/github.com/upspin/upspin/errors#Error">upspin&rsquo;s
+incarnation</a> also
+gathered some attention.</p>
+<p>I am dissatisfied with both schools of thought. Overall, neither seems to
+explicitly address, what to me is the underlying question: What <em>is</em> error
+handling? In this post, I&rsquo;m trying to describe how I interpret the term and
+why, to me, the existing approaches and discussions mostly miss the mark. Note,
+that I don&rsquo;t claim this understanding to be universal - just how <em>I</em> would put
+into words my understanding of the topic.</p>
+<hr>
+<p>Let&rsquo;s start with a maybe weird question: Why is the entry point into the
+program <code>func main()</code> and not <code>func main() error</code>? Personally, I start most of
+my programs writing</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">err</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">run</span>(); <span style="color:#a6e22e">err</span> <span style="color:#f92672">!=</span> <span style="color:#66d9ef">nil</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">log</span>.<span style="color:#a6e22e">Fatal</span>(<span style="color:#a6e22e">err</span>)
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">run</span>() <span style="color:#66d9ef">error</span> {
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// …
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>}
+</span></span></code></pre></div><p>This allows me to use <code>defer</code>, pass on errors and all that good stuff. So, why
+doesn&rsquo;t the language just do that for me?</p>
+<p>We can find part of the answer in <a href="https://groups.google.com/d/topic/golang-nuts/6xl02B_MxdA/discussion">this old golang-nuts thread</a>.
+It is about return codes, instead of an <code>error</code>, but the principle is the
+same. And the best answer - in my opinion - is this:</p>
+<blockquote>
+<p>I think the returned status is OS-specific, and so Go the language should not
+define its type (Maybe some OS can only report 8-bit result while some other
+OS support arbitrary string as program status, there is considerable
+differences between that; there might even be environment that don&rsquo;t support
+returning status code or the concept of status code simply doesn&rsquo;t exist)</p>
+<p>I imagine some Plan 9 users might be disagree with the signature of
+<code>os.Exit()</code>.</p>
+</blockquote>
+<p>So, in essence: Not all implementations would necessarily be able to assign a
+reasonable meaning to a return code (or error) from <code>main</code>. For example, an
+embedded device likely couldn&rsquo;t really do anything with it. It thus seems
+preferable to not couple the language to this decision which only <em>really</em> makes
+semantic sense on a limited subset of implementations. Instead, we provide
+mechanisms in the standard library to exit the program or take any other
+reasonable action and then let the developer decide, under what circumstances
+they want to exit the program and with what code. Being coupled to a decision
+in the standard library is better than being coupled in the language itself.
+And a developer who targets a platform where an exit code doesn&rsquo;t make sense,
+can take a different action instead.</p>
+<p>Of course, this leaves the programmer with a problem: What to do with errors?
+We could write it to stderr, but <code>fmt.Fprintf</code> <em>also</em> returns an error, so what
+to do with that one? Above I used <code>log.Fatal</code>, which does <em>not</em> return an error.
+What happens if the underlying <code>io.Writer</code> fails to write, though? What
+does <code>log</code> do with the resulting error? The answer is, of course: It ignores
+any errors.</p>
+<p>The point is, that passing on the error is not a solution. <em>Eventually</em> every
+program will return to <code>main</code> (or <code>os.Exit</code> or panic) and the buck stops there.
+It needs to get <em>handled</em> and the signature of <code>main</code> enforces that the only
+way to do that is via side-effects - and if they fail, you just have to deal
+with that one too.</p>
+<hr>
+<p>Let&rsquo;s continue with a similar question, that has a similar answer, that
+occasionally comes up: Why doesn&rsquo;t <code>ServeHTTP</code> return an <code>error</code>? Sooner or
+later, people face the question of what to do with errors in their HTTP
+Handlers. For example, what if you are writing out a JSON object and
+<code>Marshal</code> fails? In fact, a lot of HTTP frameworks out there will define their
+own handler-type, which differs from <code>http.Handler</code> in exactly that way. But if
+everyone wants to return an <code>error</code> from their handler, why doesn&rsquo;t the
+interface just add that error return itself? Was that just an oversight?</p>
+<p>I&rsquo;m strongly arguing that no, this was not an oversight, but the correct design
+decision. Because the HTTP Server package <em>can not handle any errors</em>. An HTTP
+server is supposed to stay running, every request demands a response. If
+<code>ServeHTTP</code> would return an <code>error</code>, the server would have to do <em>something</em>
+with it, but what to do is highly application-specific. You might respond that
+it should serve a 500 error code, but in 99% of cases, that is the wrong thing
+to do. Instead you should serve a more specific error code, so the client
+knows (for example) whether to retry or if the response is cacheable.
+<code>http.Server</code> could also just ignore the error and instead drop the request on
+the floor, but that&rsquo;s even worse. Or it could propagate it up the stack. But as
+we determined, eventually it would have to reach <code>main</code> and the buck stops
+there. You probably don&rsquo;t want your server to come down, every time a request
+contains an invalid parameter.</p>
+<p>So, given that a) every request needs an answer and b) the right answer is
+highly application-specific, the translation from errors into status codes
+<em>has</em> to happen in application code. And just like <code>main</code> enforces you to
+handle any errors via side-effects by not allowing you to return an <code>error</code>, so
+does <code>http</code> force you to handle any errors via writing a response by not
+allowing you to return an <code>error</code>.<sup id="fnref:1"><a href="#fn:1" class="footnote-ref" role="doc-noteref">1</a></sup></p>
+<p>So, what are you supposed to do, when <code>json.Marshal</code> fails? Well, that depends
+on our application. Increment a metric. Log the error. panic. Write out a 500.
+Ignore it and write a 200. Commit to the uncomfortable knowledge, that
+sometimes, you can&rsquo;t just pass the decision on what to do with an error to
+someone else.</p>
+<hr>
+<p>These two examples distill, I think, pretty well, what I view as error
+<em>handling</em>: An error is handled, when you destroy the error value. In that
+parlance, <code>log.Error</code> handles any errors of the underlying writer by not
+returning them. Every program needs to handle any error in <em>some</em> way, because
+<code>main</code> can&rsquo;t return anything and the values need to go <em>somewhere</em>. Any HTTP
+handler needs to actually <em>handle</em> errors, by translating them into HTTP
+responses.</p>
+<p>And in that parlance, packages like <code>pkg/errors</code> have little, really, to do with
+error <em>handling</em> - instead, they provides you with a strategy for the case where
+you are <em>not</em> handling your errors. In the same vein, proposals that address
+the repetitive checking of errors via extra syntax do not really simplify their
+handling at all - they just move it around a bit. I would term that <em>error
+propagation</em>, instead - no doubt important, but keep in mind, that an error
+that was <em>handled</em>, doesn&rsquo;t need to be propagated at all. So to me, a good
+approach to error handling would be characterized by mostly obviating the need
+for convenient error propagation mechanisms.</p>
+<p>And to me, at least, it seems that we talk too little about how to handle
+errors, in the end.</p>
+<hr>
+<p>Does Go encourage explicit error handling? This is the phrasing very often used
+to justify the repetitive nature, but I tend to disagree. Compare, for example,
+Go&rsquo;s approach to checked exceptions in Java: There, errors are propagated via
+exceptions. Every exception that could be thrown (theoretically) must be
+annotated in the method signature. Any exception that you handle, has to be
+mentioned in a try-catch-statement. And the compiler will refuse to compile a
+program which does not explicitly mention how exceptions are handled. This, to
+me, seems like the pinnacle of <em>explicit</em> error handling. Rust, too, requires
+this - it introduces a <code>?</code> operator to signify propagating an error, but that,
+still, is an explicit annotation. And apart from that, you can&rsquo;t use the return
+value of a function that might propagate an error, without explicitly handling
+that error first.</p>
+<p>In Go, on the other hand, it is not only perfectly acceptable to ignore errors
+when it makes sense (for example, I will always ignore errors created from
+writing to a <a href="https://godoc.org/bytes#Buffer.Write"><code>*bytes.Buffer</code></a>), it is
+actually often the only sensible thing to do. It is fundamentally not only
+okay, but 99% of times <em>correct</em> to just completely ignore the error returned
+by <code>fmt.Println</code>. And while it makes sense to check the error returned from
+<code>json.Marshal</code> in your HTTP handler against <code>*json.MarshalError</code> (to
+panic/log/complain loudly, because your code is buggy), any other errors
+<em>should 99% of the time just be ignored</em>. And that&rsquo;s fine.</p>
+<p>I believe that to say Go encourages explicit error handling, it would need some
+mechanism of checked exceptions, Result types, or a requirement to pass an
+<a href="https://github.com/kisielk/errcheck">errcheck</a> like analysis in the compiler.</p>
+<p>I think it would be closer to say, that Go encourages <em>local</em> error handling.
+That is, the code that handles an error, is close to the code that produced it.
+Exceptions encourages the two to be separated: There are usually several
+or many lines of code in a single <code>try</code>-block, all of which share one
+<code>catch</code>-block and it is hard to tell which of the lines produced it. And very
+often, the actual error location is several stack frames deep. You could
+contrast this with Go, where the error return is immediately obvious from the
+code and if you have a line of error handling, it is usually immediately
+attached to the function call that produced it.</p>
+<p>However, that still seems to come short, in my view. After all, there is
+nothing to force you to do that. And in fact, one of the most often <a href="https://blog.golang.org/errors-are-values">cited
+articles about Go error handling</a> is
+often interpreted to encourage exactly that. Plus, a lot of people end up
+writing <code>return err</code> far too often, simply propagating the error to be
+<em>handled</em> elsewhere. And the proliferation of error-wrapping libraries happens
+in the same vein: What their proponents phrase as &ldquo;adding context to the error
+value&rdquo;, I interpret as &ldquo;adding back some of the information as a crutch, that
+you removed when passing the error to non-local handling code&rdquo;. Sadly, far too
+often, the error then ends up not being handled at all, as everyone just takes
+advantage of that crutch. This leaves the end-user with an error message that is
+essentially a poorly formatted, non-contiguous stacktrace.</p>
+<p>Personally, I&rsquo;d characterize Go&rsquo;s approach like this: In Go, error handling is
+simply first-class code. By forcing you to use exactly the same control-flow
+mechanisms and treat errors like any other data, Go encourages you to code your
+error handling. Often that means a bunch of control flow to catch and recover
+from any errors where they occur. But that&rsquo;s not &ldquo;clutter&rdquo;, just as it is not
+&ldquo;clutter&rdquo; to write <code>if n &lt; 1 { return 1 }</code> when writing a Fibonacci function
+(to choose a trivial example). It is just code. And yes, sometimes that code
+might also store the error away or propagate it out-of-band to reduce
+repetition <em>where it makes sense</em> - like in above blog post. But focussing on
+the &ldquo;happy path&rdquo; is a bit of a distraction: Your <em>users</em> will definitely be
+more happy about those parts of the control flow that make the errors disappear
+or transform them into clean, actionable advise on how to solve the problem.</p>
+<p>So, in my reading, the title of the Go blog post puts the emphasis in slightly
+the wrong place - and often, people take the wrong message from it, in my
+opinion. Not &ldquo;errors are values&rdquo;, but &ldquo;error handling is code&rdquo;.</p>
+<hr>
+<p>So, what <em>would</em> be my advise for handling errors? To be honest, I don&rsquo;t know
+yet - and I&rsquo;m probably in no place to lecture anyone anyway.</p>
+<p>Personally, I&rsquo;ve been trying for the last couple of months to take a page out
+of <code>http.Handler</code>s playbook and try, as much as possible, to completely avoid
+returning an error. Instead of thinking &ldquo;I should return an error here, in case
+I ever do any operation that fails&rdquo;, I instead think &ldquo;is there <em>any way at
+all</em> I can get away with not returning an error here?&rdquo;. It doesn&rsquo;t always work
+and sometimes you <em>do</em> have to pass errors around or wrap them. But I am
+forcing myself to think very hard about handling my errors and it encourages a
+programming-style of isolating failing components. The constraint of not being
+able to return an error tends to make you creative in how to handle it.</p>
+<hr>
+<p>I think <em>this</em> particular pattern is fine, though, personally, I don&rsquo;t
+really see the point. Anything that builds an <code>appError</code> needs to provide
+the complete response anyway, so you might as well just write it out
+directly. YMMV.</p>
+<section class="footnotes" role="doc-endnotes">
+<hr>
+<ol>
+<li id="fn:1" role="doc-endnote">
+<p>You might be tempted to suggest, that you could
+define an <code>HTTPError</code>, containing the necessary info. Indeed, that&rsquo;s what the
+<a href="https://blog.golang.org/error-handling-and-go#TOC_3.">official Go blog</a> does,
+so it can&rsquo;t be bad? And indeed, that <em>is</em> what they do, but note that they do
+<em>not</em> actually return an <code>error</code> in the end - they return an <code>appError</code>, which
+contains the necessary information. Exactly <em>because</em> they don&rsquo;t know how to
+deal with general errors. So they translate any errors into a domain specific
+type that carries the response. So, that is <em>not</em> the same as returning an
+<code>error</code>.&#160;<a href="#fnref:1" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+</ol>
+</section>
+]]></content></entry></feed>

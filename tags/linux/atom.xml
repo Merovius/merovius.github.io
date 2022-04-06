@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">in linux on Mero's Blog</title><link href="https://blog.merovius.de/tags/linux/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/linux/atom.xml"/><updated>2022-04-06T09:07:18+00:00</updated><id>https://blog.merovius.de/tags/linux/</id><author><name>Axel Wagner</name></author><entry><title type="html">ext4: Mysterious “No space left on device”-errors</title><link href="https://blog.merovius.de/posts/2013-10-20-ext4-mysterious-no-space-left-on/" rel="alternate" type="text/html"/><id>https://blog.merovius.de//2013/10/20/ext4-mysterious-no-space-left-on.html</id><published>2013-10-20T21:13:07+00:00</published><updated>2013-10-20T21:13:07+00:00</updated><content type="html"><![CDATA[<p><strong>tl;dr: ext4 has a feature called <code>dir_index</code> enabled by default, which is
+quite susceptible to hash-collisions</strong></p>
+<p>I am currently restructuring my mail-setup. Currently, I use offlineimap to
+sync my separate accounts to a series of maildirs on my server. I then use sup
+on the server as a MUA. I want to switch to a local setup with notmuch, so I
+set up an dovecot imapd on my server and have all my accounts forward to my
+primary address. I then want to use offlineimap to have my mails in a local
+maildir, which I browse with notmuch.</p>
+<p>I then stumbled about a curious problem: When trying to copy my mails from my
+server to my local harddisk, it would fail after about 50K E-mails with the
+message “could not create xyz: no space left on device” (actually, offlineimap
+would just hog all my CPUs and freeze my whole machine in the process, but
+that&rsquo;s a different story). But there actually was plenty of space left.</p>
+<p>It took me and a few friends a whole while to discover the problem. So if you
+ever get this error message (using ext4) you should probably check these four
+things (my issue was the last one):</p>
+<h2 id="do-you-actually-have-enough-space">Do you <em>actually</em> have enough space?</h2>
+<p>Use <code>df -h</code>. There is actually a very common pitfall with ext4. Let&rsquo;s have a look:</p>
+<pre tabindex="0"><code>mero@rincewind ~$ df -h
+Filesystem              Size  Used Avail Use% Mounted on
+/dev/mapper/sda2_crypt  235G  164G   69G  71% /
+...
+</code></pre><p>If you add 164G and 69G, you get 233G, which is 2G short of the actual size.
+This is about 1%, but on your system it will likely be more of 5% difference.
+The reason is the distinction between &ldquo;free&rdquo; and &ldquo;available&rdquo; space. Per default
+on ext4, there are about 5% of &ldquo;reserved&rdquo; blocks. This has two reasons: First
+ext4&rsquo;s performance seems to take a small hit, when almost full. Secondly, it
+leaves a little space for root to login and troubleshoot problems or delete
+some files, when users filled their home-directory. If there was <em>no</em> space
+left, it might well be, that no login is possible anymore (because of the
+creation of temporary files, logfiles, history-files…). So use <code>tune2fs &lt;path_to_your_disk&gt;</code> to see, if you have reserved blocks, and how many of them:</p>
+<pre tabindex="0"><code>mero@rincewind ~$ sudo tune2fs -l /dev/mapper/sda2_crypt | grep &#34;Reserved block&#34;
+Reserved block count:     2499541
+Reserved blocks uid:      0 (user root)
+Reserved blocks gid:      0 (group root)
+</code></pre><h2 id="do-you-have-too-many-files">Do you have too many files?</h2>
+<p>Even though you might have enough space left, it might well be, that you have
+too many files. ext4 allows an enormous amount of files on any file system, but
+it is limited. Checking this is easy: Just use <code>df -i</code>:</p>
+<pre tabindex="0"><code>Filesystem               Inodes  IUsed    IFree IUse% Mounted on
+/dev/mapper/sda2_crypt 15622144 925993 14696151    6% /
+...
+</code></pre><p>So as you see, that wasn&rsquo;t the problem with me. But if you ever have the <code>IUse%</code>
+column near 100, you probably want to delete some old files (and you should
+<em>definitely</em> question, how so many files could be created to begin with).</p>
+<h2 id="do-a-file-system-check">Do a file system check</h2>
+<p>At least some people on the internet say, that something like this has
+happened to them after a crash (coincidentally my system crashed before the
+problem arose. See above comments about offlineimap) and that a file system
+check got rid of it. So you probably want to run <code>fsck -f &lt;path_to_your_disk&gt;</code>
+to run such a check. You probably also want to do that from a live-system, if
+you cannot unmount it (for example if it&rsquo;s mounted at the root-dir).</p>
+<h2 id="do-you-have-dir_index-enabled">Do you have <code>dir_index</code> enabled?</h2>
+<p>So this is the punch line: ext4 has the possibility to hash the filenames of
+its contents. This enhances performance, but has a “small” problem: ext4 does
+not grow its hashtable, when it starts to fill up. Instead it returns -ENOSPC
+or “no space left on device”.</p>
+<p>ext4 uses <code>half_md4</code> as a default hashing-mechanism. If I interpret my
+google-results correctly, this uses the md4-hash algorithm, but strips it to 32
+bits. This is a classical example of the
+<a href="http://en.wikipedia.org/wiki/Birthday_problem">birthday-paradox</a>: A 32 bit
+hash means, that there are 4294967296 different hash values available, so if we
+are fair and assume a uniform distribution of hash values, that makes it highly
+unlikely to hit one specific hash. But the probability of hitting two identical
+hashes, given enough filenames, is much much higher. Using the
+<a href="http://en.wikipedia.org/wiki/Birthday_problem#Cast_as_a_collision_problem">formula</a>
+from Wikipedia we get (with about 50K files) a probability of about 25% that a
+newly added file has the same hash. This is a huge probability of failure. If
+on the other hand we take a 64bit hash-function the probability becomes much
+smaller, about 0.00000000007%.</p>
+<p>So if you have a lot of files in the same directory, you probably want to switch
+off <code>dir_index</code>, or at least change to a different hash-algorithm. You can
+check if you have <code>dir_index</code> enabled and change the hash, like this:</p>
+<pre tabindex="0"><code>mero@rincewind ~$ sudo tune2fs -l /dev/mapper/sda2_crypt | grep -o dir_index
+dir_index
+
+## Change the hash-algo to a bigger one
+mero@rincewind ~$ sudo tune2fs -E &#34;hash_alg=tea&#34; /dev/mapper/sda2_crypt
+## Disable it completely
+mero@rincewind ~$ sudo tune2fs -O &#34;^dir_index&#34;
+</code></pre><p>Note however, that <code>dir_index</code> and <code>half_md4</code> where choices made for
+performance reasons. So you might experience a performance-hit after this.</p>
+<p><strong>UPDATE:</strong> After trying it out, I realized, that the problem actually also
+persists with the tea-hash. I then had a look at <a href="https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout#Hash_Tree_Directories">the
+ext4-documentation</a>
+about the topic and it seems, that the hash is only stored as 32 bits, so it
+actually does not matter what hash we choose, regarding this particular
+problem. So if <code>half_md4</code> is chosen <a href="http://git.whamcloud.com/?p=tools/e2fsprogs.git;a=commitdiff_plain;h=d1070d91b4de8438dc78c034283baaa19b31d25e">because of its better performance and
+collision-resistance</a>
+it actually makes sense to leave it as the default. You can by the way easily
+test and reproduce the issue by using the following on an ext4 file system:</p>
+<pre tabindex="0"><code>for a in `seq 100000`
+do
+        file=`head -c 51 /dev/urandom | base64 | tr &#39;/&#39; &#39;_&#39;`
+        touch $file
+done
+</code></pre><p>Curiously, this only gives me about 160 collisions on 100K files (instead of
+about 10K collisions on 60K files), which would suggest, that my original
+sample (meaning my mailbox) exhibits some properties that make collisions more
+likely both on <code>half_md4</code> <em>and</em> <code>tea</code>.</p>
+]]></content></entry><entry><title type="html">Using i3 and vim to keep a set of notes at hand</title><link href="https://blog.merovius.de/posts/2013-10-20-using-i3-and-vim-to-keep-a-set-o/" rel="alternate" type="text/html"/><id>https://blog.merovius.de//2013/10/20/using-i3-and-vim-to-keep-a-set-o.html</id><published>2013-10-20T03:45:52+00:00</published><updated>2013-10-20T03:45:52+00:00</updated><content type="html"><![CDATA[<p><strong>tl;dr: Put a terminal with a vim-instance in an i3-scratchpad, combine it
+with autosave-when-idle and you got the perfect note keeping workflow</strong></p>
+<p>There are often occasions where I want to write something down, while not
+wanting to disturb my thought-process too much or taking too much of an effort.
+An example for the former would be a short TODO I suddenly remember while doing
+something more important. As an example for the latter, I keep an &ldquo;account&rdquo; for
+drinks at our local computer club, so that I don&rsquo;t always have to put single
+coins into the register, but can just put 20€ or something in and don&rsquo;t have to
+worry about it for a while. Combining the
+<a href="http://i3wm.org/docs/userguide.html#_scratchpad">scratchpad-window</a> feature of
+i3 with a little vim-magic makes this effortless enough to be actually
+preferable to just paying.</p>
+<p>First of, you should map a key to <code>scratchpad show</code> in i3, for example I have
+the following in my config:</p>
+<pre tabindex="0"><code>bind Mod4+Shift+21 move scratchpad
+bind Mod4+21 scratchpad show
+</code></pre><p>I can then just use <code>Mod4+&lt;backtic&gt;</code> to access the scratchpad.</p>
+<p>Now, just put a terminal in scratchpad-mode and open .notes in vim in this
+terminal. By pressing the <code>scratchpad show</code> binding repeatedly, you can send it
+to the background and bring it to the foreground again.</p>
+<p>I have my current &ldquo;balance&rdquo; in this notes-file and during the meetings of the
+computer club leave the cursor on this balance. If I take a drink, I press <code>^X</code>
+decreasing my balance by one (every drink is one Euro). If I pay, say 10 Euros
+into the register, I press <code>10^A</code> increasing my balance by 10.</p>
+<p>This is already much better, but it still has one problem: I better save that
+file every time I change my balance, else a crash would screw up my accounting.
+Luckily, vim provides autocommands and has an event for &ldquo;the user did not type
+for a while&rdquo;. This means, that we can automatically save the file if we idled
+for a few seconds, for example if we send the scratchpad window away. For this,
+we put the following in our <code>.vimrc</code>:</p>
+<pre tabindex="0"><code>&#34; Automatically save the file notes when idle
+autocmd CursorHold .notes :write
+</code></pre><p>Now adjusting my balance is just a matter of a very short key sequence:
+<code>&lt;mod4&gt;`&lt;c-x&gt;&lt;mod4&gt;` </code></p>
+]]></content></entry><entry><title type="html">Inject Environment variables into running processes</title><link href="https://blog.merovius.de/posts/2013-10-11-inject-environment-variables-int/" rel="alternate" type="text/html"/><id>https://blog.merovius.de//2013/10/11/inject-environment-variables-int.html</id><published>2013-10-11T03:25:09+00:00</published><updated>2013-10-11T03:25:09+00:00</updated><content type="html"><![CDATA[<p><strong>tl;dr: Using gdb to manipulate a running process is fun and just the right
+amount of danger to be exiting</strong></p>
+<p>Just to document this (a friend asked me): If you ever wanted for example to
+globally change your <code>$PATH</code>, or add a global <code>$LD_PRELOAD</code> (for example to use
+<a href="https://github.com/Merovius/insulterr">insulterr</a> ;) ), without restarting
+your session, gdb is your friend.</p>
+<p>You can call arbitrary functions in the context of any process (that you are
+priviledged to attach a debugger, it has to run under your uid or you have to
+be root, see <code>ptrace(2)</code> for specifics), as long as they are linked. Almost
+everything is linked to <code>libld</code>, so with enough effort this actually means
+<em>every</em> function.</p>
+<p>For example, suppose you are running <a href="http://i3wm.org">i3wm</a> and want to add
+<code>/home/user/insulterr/insulterr.so</code> to your <code>$LD_PRELOAD</code> in every process
+started by i3:</p>
+<pre tabindex="0"><code>$ gdb -p `pidof i3` `which i3`
+&lt;lots of output of gdb&gt;
+gdb $ call setenv(&#34;LD_PRELOAD&#34;, &#34;/home/user/insulterr/insulterr.so&#34;)
+gdb $ quit
+A debugging session is active.
+
+	Inferior 1 [process 2] will be detached.
+
+Quit anyway? (y or n) y
+Detaching from program: /usr/bin/i3, process 2
+</code></pre><p>This is of course a terrible hack, by high standards. Things to look out for
+are (off the top of my head):</p>
+<ul>
+<li>You call a function that manipulates <code>errno</code> or does some other non-reentrent
+things. If you are attaching the debugger right in the middle of a library
+call (or immediately after) this <em>might</em> make the program unhappy because it
+does not detect an error (or falsely thinks there is an error).</li>
+<li>You call a function that does not work in a multithreaded context and another
+thread modifies it at the same time. Bad.</li>
+<li>You interrupt a badly checked <code>read(2)</code>/<code>write(2)</code>/<code>whatever(…)</code> call and a
+badly written program doesn&rsquo;t realize it got less data then expected (and/or
+crashes).  Shouldn&rsquo;t happen in practice, if it does, file a bug.</li>
+<li>You try to use symbols that are not available. This is actually not very bad
+and can be worked around (a friend of mine had the problem of needing <code>false</code>
+and just substituted 0).</li>
+<li>You use a daemon (like <code>urxvtd(1)</code>) for your terminals and the environment
+does not get passed correctly. This is also not very bad, just confusing.
+Attach your debugger to the daemon and change the environment there too.</li>
+<li>You attach the debugger to some process vital to the interaction with your
+debugger. Your window manager is a mild example. The terminal daemon is
+slightly worse (because, well, you can&rsquo;t actually type in the terminal window
+that your debugger is running in, ergo you can&rsquo;t stop it…), but you can
+change to a virtual terminal. Something like getty or init might be killing
+it.</li>
+</ul>
+<p>Have fun!</p>
+]]></content></entry></feed>

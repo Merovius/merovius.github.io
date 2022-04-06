@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">in crypto on Mero's Blog</title><link href="https://blog.merovius.de/tags/crypto/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/crypto/atom.xml"/><updated>2022-04-06T09:07:18+00:00</updated><id>https://blog.merovius.de/tags/crypto/</id><author><name>Axel Wagner</name></author><entry><title type="html">Using roughtime as a "cryptographic notary"</title><link href="https://blog.merovius.de/posts/2018-10-10-using-roughtime-as-a-cryptographic-notary/" rel="alternate" type="text/html"/><id>https://blog.merovius.de//2018/10/18/using-roughtime-as-a-cryptographic-notary.html</id><published>2018-10-10T23:22:40+00:00</published><updated>2018-10-10T23:22:40+00:00</updated><content type="html"><![CDATA[<p><strong>tl;dr: Roughtime can be (ab)used for <a href="https://en.wikipedia.org/wiki/Trusted_timestamping#Trusted_(digital)_timestamping">Trusted Timestamping</a>. I wrote a
+<a href="https://github.com/Merovius/notary">simple tool</a> as a PoC</strong></p>
+<p>Recently, <a href="https://blog.cloudflare.com/roughtime/">Cloudflare announced</a> that they are now running a
+<a href="https://roughtime.googlesource.com/roughtime/">roughtime</a> server. Roughtime is a cryptographically secured
+time-synchronization protocol - think NTP with signatures. For an actual
+description of how it works, I recommend reading the Cloudflare blog post. But
+at it&rsquo;s very core (oversimplification ahead), the user chooses an arbitrary
+(usually randomly generated) nonce and the server signs it, plus the current
+time.</p>
+<p>One thing roughtime adds on top of this, is the ability to build a chain of
+requests. This is achieved by taking a hash of a response, combining it with a
+randomly generated &ldquo;blind&rdquo; and using the combined hash as a nonce to the next
+request. The intended use-case of this is that if a server provides the wrong
+time or otherwise misbehaves, you can obtain cryptographic proof of that fact
+by getting a timestamped signature of its response from a different server. By
+storing the initial nonce, generated blinds and responses, the entire chain can
+be validated later.</p>
+<p>When I saw Cloudflares announcement, my first thought was that it should be
+possible to use a roughtime server as a <a href="https://en.wikipedia.org/wiki/Trusted_timestamping#Trusted_(digital)_timestamping">Time Stamping Authority</a>. The
+goal is, to obtain a cryptographic proof, that you owned a particular document
+at the current point in time - for example to ensure you can proof original
+authorship without publishing the document itself.</p>
+<p>The simplest way to achieve this using roughtime is to use the SHA512 hash of
+the file as an initial nonce. That way, the roughtime server signs that hash
+together with the current time with their private key. By using the roughtime
+chain protocol, you can get that proof corroborated by multiple servers.</p>
+<p>You can also think of extending this, to get stronger properties. Using the
+hash of the file as a nonce only proves that the file existed <em>before</em> that
+specific point in time. It also doesn&rsquo;t actually prove that you had the file,
+but only the hash. This can be remediated though. If we run a regular roughtime
+request, the resulting response is unpredictable (to us) and signs the current
+time. Thus, if we use a hash of that response as a prefix &ldquo;salt&rdquo; of the file
+itself, the resulting hash proofs that we knew the file <em>after</em> that chain
+ran. We can then use that hash as a nonce for another roughtime chain and get a
+proof that we had the file at a specific point (or rather, a small interval) in
+time. Furthermore, we can opt to use the file-hash not as the nonce itself, but
+as a blind. The advantage is, that the blind is never transmitted over the
+network, so the actual proof is only available to us (if we use it as a nonce,
+an eavesdropper could intercept the proof). I illustrated these options in a
+<a href="https://docs.google.com/presentation/d/1quTJfXHvBZCjKJgL6HjUFb_jhDF-PghBwm_lTFLAjdg/edit#slide=id.g43c753f2a5_1_542">recent talk</a> I gave on the subject.</p>
+<p>These ideas are mostly academic. I&rsquo;m not sure how useful these properties are
+in practice. Nevertheless, the idea intriguiged me enough to <a href="https://github.com/Merovius/notary">implement it</a>
+in a simple tool. It&rsquo;s in a pretty rough, proof-of-concept like shape and I
+don&rsquo;t know if I will ever progress it from there. It also comes with a client
+implementation of the roughtime protocol in Go - initially I was not aware that
+there already was a Go implementation, but that also is not go-gettable. Either
+way, it was fun to implement it myself :)</p>
+]]></content></entry><entry><title type="html">Signed blog posts</title><link href="https://blog.merovius.de/posts/2014-01-23-signed-blog-posts/" rel="alternate" type="text/html"/><id>https://blog.merovius.de//2014/01/23/signed-blog-posts.html</id><published>2014-01-23T04:04:25+00:00</published><updated>2014-01-23T04:04:25+00:00</updated><content type="html"><![CDATA[<p><strong>tl;dr: I sign my blog posts. curl
+<a href="http://blog.merovius.de/2014/01/23/signed-blog-posts.html">http://blog.merovius.de/2014/01/23/signed-blog-posts.html</a> | gpg</strong></p>
+<p><strong>Update: I no longer do this. I haven&rsquo;t for a while</strong></p>
+<p>I might have to update my TLS server certificate soon, because the last change
+seems to have broken the verification of <a href="https://merovius.de/">https://merovius.de/</a>. This is nothing
+too exciting, but it occured to me that I should actually provide some warning
+or notice in that case, so that people can be sure, that there is nothing
+wrong. The easiest way to accomplish this would be a blogpost and the easiest
+way to verify that the statements in that blogpost are correct would be, to
+provide a signed version. So because of this (and, well, because I can) I
+decided to sign all my blogposts with my gpg-key. People who know me should
+have my gpg key so they can verify that I really have written everything I
+claim.</p>
+<p>I could have used
+<a href="https://github.com/kormoc/jekyll-gpg_clearsign">jekyll-gpg_clearsign</a>, but it
+does not really do the right thing in my opinion. It wraps all the HTML in a
+GPG SIGNED MESSAGE block and attaches a signature. This has the advantage of
+minimum overhead - you only add the signature itself plus some constant
+comments of overhead. However, it makes really verifying the contents of a
+blogpost pretty tedious: You would have to either manually parse the HTML in
+your mind, or you would have to save it to disk and view it in your browser,
+because you cannot be sure, that the HTML you get when verifying it via curl on
+the commandline is the same you get in your browser. You could write a
+browser-extension or something similar that looks for these blocks, but still,
+the content could be tempered with (for example: Add the correctly signed page
+as a comment in a tampered with page. Or try to somehow include some javascript
+that changes the text after verifying…). Also, the generated HTML is not really
+what I want to sign; after all I can not really attest that the HTML-generation
+is really solid and trustworthy, I never read the jekyll source-code and I
+don&rsquo;t want to, at every update. What I really want to sign is the stuff I wrote
+myself, the markdown (or whatever) I put into the post. This has the additional
+advantage, that most markdown is easily parseable by humans, so you can
+actually have your gpg output the signed text and immediately read everything I
+wrote.</p>
+<p>So this is, what happens now. In every blogpost there is a HTML-comment
+embedded, containing the original markdown I wrote for this post in compressed,
+signed and ASCII-armored form. You can try it via</p>
+<pre><code>curl http://blog.merovius.de/2014/01/23/signed-blog-posts.html | gpg
+</code></pre>
+<p>This should output some markdown to stdout and a synopsis of gpg about a valid
+(possibly untrusted, if you don&rsquo;t have my gpg-key) signature on stderr. Neat!</p>
+<p>The <a href="http://git.merovius.de/posts/commit/?id=dd005159f9fb25ebc8ef789608a609bcb65fc62c">changes</a>
+needed in the blog-code itself where pretty minimal. I had however (since I
+don&rsquo;t want my gpg secret key to be on the server) to change the deployment a
+little bit. Where before a git push would trigger a hook on the remote
+repository on my server that ran jekyll, now I have a local script, that wraps
+a jekyll build, an rsync to the webserver-directory and a git push. gpg-agent
+ensures, that I am not asked for a passphrase too often.</p>
+<p>So, yeah. Crypto is cool. And the procrastinator prevailed again!</p>
+]]></content></entry><entry><title type="html">New PGP Key</title><link href="https://blog.merovius.de/posts/2013-10-03-new-pgp-key/" rel="alternate" type="text/html"/><id>https://blog.merovius.de//2013/10/03/new-pgp-key.html</id><published>2013-10-03T00:44:00+00:00</published><updated>2013-10-03T00:44:00+00:00</updated><content type="html"><![CDATA[<p>Because I recently applied for the position of a Debian maintainer, I
+finally had to upgrade my PGP Key to a more secure 4096 bit RSA. The
+new fingerprint is</p>
+<pre><code>AF03 1CB8 DFFB 7DC5 E1EE  EB04 A7C9 FF06 3F3D 2E03
+</code></pre>
+<p>I signed the new key with my old key and <a href="http://pgp.mit.edu/pks/lookup?op=vindex&amp;search=0xA7C9FF063F3D2E03">uploaded it to the
+keyservers</a>.
+My old key will be valid for a little longer, so you can still send me
+encrypted Mails using my old key, but I would ask you to transition as
+fast as possible to the new one. If the signature with my old key is
+enough to earn your trust, you can delete the old key and set the new
+one to trusted (and maybe even sign it again and mail me the signed
+key or upload it), else you can check the fingerprint in person when
+we meet next time.</p>
+]]></content></entry></feed>

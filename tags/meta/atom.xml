@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">in meta on Mero's Blog</title><link href="https://blog.merovius.de/tags/meta/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/meta/atom.xml"/><updated>2022-04-06T09:07:18+00:00</updated><id>https://blog.merovius.de/tags/meta/</id><author><name>Axel Wagner</name></author><entry><title type="html">Heartbleed: New certificates</title><link href="https://blog.merovius.de/posts/2014-04-10-heartbleed-new-certificates/" rel="alternate" type="text/html"/><id>https://blog.merovius.de//2014/04/10/heartbleed-new-certificates.html</id><published>2014-04-10T21:28:25+00:00</published><updated>2014-04-10T21:28:25+00:00</updated><content type="html"><![CDATA[<p>Due to the Heartbleed vulnerability I had to recreate all TLS-keys of my
+server. Since CACert appears to be mostly dead (or dying at least), I am
+currently on the lookout for a new CA. In the meantime I switched to
+self-signed certificates for all my services.</p>
+<p>The new fingerprints are:</p>
+<table>
+	<tr>
+		<th>Service</th>
+		<th>SHA1-Fingerprint</th>
+	</tr>
+	<tr>
+		<td>merovius.de</td>
+		<td>8C:85:B1:9E:37:92:FE:C9:71:F6:0E:C6:9B:25:9C:CD:30:2B:D5:35</td>
+	</tr>
+	<tr>
+		<td>blog.merovius.de</td>
+		<td>1B:DB:45:11:F3:EE:66:8D:3B:DF:63:B9:7C:D9:FC:26:A4:D1:E1:B8</td>
+	</tr>
+	<tr>
+		<td>git.merovius.de</td>
+		<td>65:51:16:25:1A:9E:50:B2:F7:D7:8A:2B:77:DE:DE:0C:02:3C:6C:ED</td>
+	</tr>
+	<tr>
+		<td>smtp (mail.merovius.de)</td>
+		<td>1F:E5:3F:9D:EE:B4:47:AE:2E:02:D8:2C:1E:2A:6C:FC:D6:62:99:F4</td>
+	</tr>
+	<tr>
+		<td>jabber (merovius.de)</th>
+		<td>15:64:29:49:82:0E:8B:76:47:1A:19:5B:98:6F:E4:56:24:D9:69:07</td>
+	</tr>
+</table>
+<p>This is of course useless in the general case, but if you already trust my
+gpg-key, you can use</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-sh" data-lang="sh"><span style="display:flex;"><span>curl http://blog.merovius.de/2014/04/10/heartbleed-new-certificates.html | gpg
+</span></span></code></pre></div><p>to get this post signed and verified.</p>
+]]></content></entry><entry><title type="html">Signed blog posts</title><link href="https://blog.merovius.de/posts/2014-01-23-signed-blog-posts/" rel="alternate" type="text/html"/><id>https://blog.merovius.de//2014/01/23/signed-blog-posts.html</id><published>2014-01-23T04:04:25+00:00</published><updated>2014-01-23T04:04:25+00:00</updated><content type="html"><![CDATA[<p><strong>tl;dr: I sign my blog posts. curl
+<a href="http://blog.merovius.de/2014/01/23/signed-blog-posts.html">http://blog.merovius.de/2014/01/23/signed-blog-posts.html</a> | gpg</strong></p>
+<p><strong>Update: I no longer do this. I haven&rsquo;t for a while</strong></p>
+<p>I might have to update my TLS server certificate soon, because the last change
+seems to have broken the verification of <a href="https://merovius.de/">https://merovius.de/</a>. This is nothing
+too exciting, but it occured to me that I should actually provide some warning
+or notice in that case, so that people can be sure, that there is nothing
+wrong. The easiest way to accomplish this would be a blogpost and the easiest
+way to verify that the statements in that blogpost are correct would be, to
+provide a signed version. So because of this (and, well, because I can) I
+decided to sign all my blogposts with my gpg-key. People who know me should
+have my gpg key so they can verify that I really have written everything I
+claim.</p>
+<p>I could have used
+<a href="https://github.com/kormoc/jekyll-gpg_clearsign">jekyll-gpg_clearsign</a>, but it
+does not really do the right thing in my opinion. It wraps all the HTML in a
+GPG SIGNED MESSAGE block and attaches a signature. This has the advantage of
+minimum overhead - you only add the signature itself plus some constant
+comments of overhead. However, it makes really verifying the contents of a
+blogpost pretty tedious: You would have to either manually parse the HTML in
+your mind, or you would have to save it to disk and view it in your browser,
+because you cannot be sure, that the HTML you get when verifying it via curl on
+the commandline is the same you get in your browser. You could write a
+browser-extension or something similar that looks for these blocks, but still,
+the content could be tempered with (for example: Add the correctly signed page
+as a comment in a tampered with page. Or try to somehow include some javascript
+that changes the text after verifying…). Also, the generated HTML is not really
+what I want to sign; after all I can not really attest that the HTML-generation
+is really solid and trustworthy, I never read the jekyll source-code and I
+don&rsquo;t want to, at every update. What I really want to sign is the stuff I wrote
+myself, the markdown (or whatever) I put into the post. This has the additional
+advantage, that most markdown is easily parseable by humans, so you can
+actually have your gpg output the signed text and immediately read everything I
+wrote.</p>
+<p>So this is, what happens now. In every blogpost there is a HTML-comment
+embedded, containing the original markdown I wrote for this post in compressed,
+signed and ASCII-armored form. You can try it via</p>
+<pre><code>curl http://blog.merovius.de/2014/01/23/signed-blog-posts.html | gpg
+</code></pre>
+<p>This should output some markdown to stdout and a synopsis of gpg about a valid
+(possibly untrusted, if you don&rsquo;t have my gpg-key) signature on stderr. Neat!</p>
+<p>The <a href="http://git.merovius.de/posts/commit/?id=dd005159f9fb25ebc8ef789608a609bcb65fc62c">changes</a>
+needed in the blog-code itself where pretty minimal. I had however (since I
+don&rsquo;t want my gpg secret key to be on the server) to change the deployment a
+little bit. Where before a git push would trigger a hook on the remote
+repository on my server that ran jekyll, now I have a local script, that wraps
+a jekyll build, an rsync to the webserver-directory and a git push. gpg-agent
+ensures, that I am not asked for a passphrase too often.</p>
+<p>So, yeah. Crypto is cool. And the procrastinator prevailed again!</p>
+]]></content></entry><entry><title type="html">New PGP Key</title><link href="https://blog.merovius.de/posts/2013-10-03-new-pgp-key/" rel="alternate" type="text/html"/><id>https://blog.merovius.de//2013/10/03/new-pgp-key.html</id><published>2013-10-03T00:44:00+00:00</published><updated>2013-10-03T00:44:00+00:00</updated><content type="html"><![CDATA[<p>Because I recently applied for the position of a Debian maintainer, I
+finally had to upgrade my PGP Key to a more secure 4096 bit RSA. The
+new fingerprint is</p>
+<pre><code>AF03 1CB8 DFFB 7DC5 E1EE  EB04 A7C9 FF06 3F3D 2E03
+</code></pre>
+<p>I signed the new key with my old key and <a href="http://pgp.mit.edu/pks/lookup?op=vindex&amp;search=0xA7C9FF063F3D2E03">uploaded it to the
+keyservers</a>.
+My old key will be valid for a little longer, so you can still send me
+encrypted Mails using my old key, but I would ask you to transition as
+fast as possible to the new one. If the signature with my old key is
+enough to earn your trust, you can delete the old key and set the new
+one to trusted (and maybe even sign it again and mail me the signed
+key or upload it), else you can check the fingerprint in person when
+we meet next time.</p>
+]]></content></entry><entry><title type="html">Lazy blogging with jekyll</title><link href="https://blog.merovius.de/posts/2013-09-28-lazy-blogging-with-jekyll/" rel="alternate" type="text/html"/><id>https://blog.merovius.de//2013/09/28/lazy-blogging-with-jekyll.html</id><published>2013-09-28T15:11:10+00:00</published><updated>2013-09-28T15:11:10+00:00</updated><content type="html"><![CDATA[<p><strong>tl;dr: I put up a <a href="https://gist.github.com/Merovius/6736709">small script</a> to
+automate creating blog-posts in jekyll</strong></p>
+<p>If you think about setting up your own blog, jekyll seems to be an appropriate
+choice. This short guide should put you through the process of having an easy
+setup for writing and deploying your blog via your favourite editor (vim) and
+your favourite version control system (git) to a publicly available server via
+ssh.</p>
+<p>First thing you will need, is to have jekyll installed on both machines (the
+ones where you will write your posts and the one where you will deploy them to).
+Because the debian-version appears to be horribly outdated, I installed it via
+gem. As far as I understood, this has the advantage of making an installation
+without root-privileges possible. You should also have git available on both
+machines.</p>
+<p>Initializing your blog is pretty easy, <code>jekyll new mynewblog</code> (on your local
+machine) should suffice.  You still want to do some configuration and
+customization, most of which should be straight-forward. Edit the <code>index.html</code>,
+the <code>_config.yml</code> and the <code>_layouts/default.html</code>. You might also want to have
+an Atom-template, so people can subscribe to your blog in their favourite
+RSS-reader. My good friend Stefan <a href="https://git.yrden.de/?p=blog.git/.git;a=blob;f=atom.xml;hb=HEAD">helped with
+that</a> just put
+that file into the root of your blog-directory, edit your blogtitle and
+everything into it and add the line
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-html" data-lang="html"><span style="display:flex;"><span>&lt;<span style="color:#f92672">link</span> <span style="color:#a6e22e">rel</span><span style="color:#f92672">=</span><span style="color:#e6db74">&#34;alternate&#34;</span> <span style="color:#a6e22e">type</span><span style="color:#f92672">=</span><span style="color:#e6db74">&#34;application/atom+xml&#34;</span> <span style="color:#a6e22e">href</span><span style="color:#f92672">=</span><span style="color:#e6db74">&#34;/atom.xml&#34;</span> <span style="color:#a6e22e">title</span><span style="color:#f92672">=</span><span style="color:#e6db74">&#34;Atom feed&#34;</span>&gt;</span></span></code></pre></div>
+in the <code>&lt;head&gt;</code> section of <code>_layouts/default.html</code>.</p>
+<p>Next thing is setting up deployment. Just <code>git init</code> a blog, <code>git add</code> every
+configuration file, page, template and whatnot and <code>git commit</code> it. ssh onto
+your deployment-machine and do a <code>git init --bare blog.git</code>. Save the following
+file to <code>blog.git/hooks/post-update</code> and change the path to point to a
+directory, that is served by your http-server:
+{% gist 6736709 post-update %}
+Everytime you push into <code>blog.git</code> you will then have jekyll automatically
+rebuild your blog. You now only have to do the following on your local machine
+to deploy your blog:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-sh" data-lang="sh"><span style="display:flex;"><span>git remote add origin username@example.com:blog.git
+</span></span><span style="display:flex;"><span>git push --set-upstream origin master
+</span></span></code></pre></div><p>Now to the really fancy stuff. Jekyll expects your blogposts to live under the
+<code>_posts</code>-directory under a special filename-format and to have a YAML-preamble,
+containing some configuration. It can be quite cumbersome to manage this
+yourself, so I wrote a <a href="https://gist.github.com/Merovius/6736709">shellscript</a>
+to ease the process. Put it anywhere in your path (i chose the name <code>newpost</code>)
+and make it executable.</p>
+<p>When you run the script, it will look into the current directory for a
+jekyll-blog and create a draft from a small template given in the script. It
+will then optionally run a jekyll-development server, so that you can preview
+your blog-post in your browser (by saving the draft) and open the draft in your
+favourite editor. After you close your editor, the jekyll server will be
+stopped and the draft will be saved under <code>_posts/YYYY-MM-DD-abbrev-title.fmt</code>,
+where <code>YYYY-MM-DD</code> is the current date (date and time will also be automatically
+added to the YAML-preamble), <code>fmt</code> is a configurable format (markdown is default)
+and <code>abbrev-title</code> is a short string derived from the title you put in.</p>
+<p>There will also (optionally) be a git-commit created with a default
+commit-message. You can edit the message in an editor and abort the commit, by
+deleting everything and saving an empty commit-message. If you really want
+(though I would not advise it) you can also automatically push it, after you&rsquo;re
+done.</p>
+<p>After this setup, to create a new blogpost, you just have to <code>cd</code> to your
+blog-repository, run <code>newpost</code>, type your blogpost (and add a title), preview it
+in your browsers, exit your editor and you have everything ready to push. It
+can&rsquo;t get much easier.</p>
+]]></content></entry><entry><title type="html">Relaunch</title><link href="https://blog.merovius.de/posts/2013-09-28-relaunch/" rel="alternate" type="text/html"/><id>https://blog.merovius.de//2013/09/28/relaunch.html</id><published>2013-09-28T02:08:05+00:00</published><updated>2013-09-28T02:08:05+00:00</updated><content type="html"><![CDATA[<p>Years ago I took down my blog because I was so unsatisfied with
+wordpress. In these years I started about 5 times to write my own
+git-based blog-engine and about 5 times I stopped after making
+considerable progress (mostly because it was too hard to integrate
+comments). This time the urge to restart my blog is finally
+overpowering my chronic nii-syndrome and I decided to use
+<a href="http://jekyllrb.com/">jekyll</a> as a blog-engine and add some git-hook-magic myself.</p>
+<p>The layout is still pretty shitty, it&rsquo;s the default of jekyll, but I
+wanted to put it online before seing my efforts die again on such
+minor details.</p>
+<p>So this is finally the relaunch of my blog. Yay for me.</p>
+]]></content></entry></feed>
