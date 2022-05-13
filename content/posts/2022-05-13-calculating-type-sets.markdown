@@ -218,7 +218,7 @@ this can be easily done in the case we are interested in.
 All of this allows us to talk about what we mean by “computing a set is hard”.
 With this equivalency, checking if a given object is in a set becomes the
 *decision* problem of SAT - deciding if `x∈S` is equivalent to deciding if
-`f[S](x)`evaluates to `true`. And checking if a set is empty becomes the
+`f[S](x)` evaluates to `true`. And checking if a set is empty becomes the
 *solution* problem of SAT, as it is equivalent to verifying that `f[S]` is not
 satisfiable.
 
@@ -226,7 +226,7 @@ With this, let us look at the specific sets we are interested in.
 
 ## Basic interfaces as type sets
 
-Interfaces in Go have always described sets of types. For example, the interface
+Interfaces in Go are used to describe sets of types. For example, the interface
 
 ```go
 type S interface {
@@ -238,7 +238,7 @@ type S interface {
 
 is “the set of all types which have a method `X()` and a method `Y()` and a method `Z()`”.
 
-We also have a way to express set intersection, using [interface embedding](https://go.dev/ref/spec#Embedded_interfaces):
+We can also express set intersection, using [interface embedding](https://go.dev/ref/spec#Embedded_interfaces):
 
 
 ```go
@@ -250,20 +250,20 @@ type U interface {
 }
 ```
 
-This expresses `T=S∩T` as an interface. We can also view the predicate “has a
+This expresses `U=S∩T` as an interface. Or we can view the predicate “has a
 method `X()`” as a boolean variable and think of this as the formula `X∧Y`.
 
 Surprisingly, there is also a simple form of negation. It happens implicitly,
-because a type can not have two methods with the same name, but different
-types. So, implicitly, if a type has a method `X()`, it does *not* have a
-method `X() int`, for example[^5]:
+because a type can not have two different methods with the same name. So,
+implicitly, if a type has a method `X()` it does *not* have a method `X()
+int` for example[^5]:
 
 ```go
 type X interface { X() }
 type NotX interface{ X() int }
 ```
 
-This meant that we can express interfaces which could never be satisfied by
+This means that we can express interfaces which could never be satisfied by
 any type (i.e. which describe an empty type set):
 
 ```go
@@ -272,7 +272,7 @@ interface{ X; NotX }
 
 [The compiler rejects such interfaces](https://go.dev/play/p/r4kpXNynscX).
 
-So we had a language to build boolean formulas, where every formula had the
+So we have a language to build boolean formulas, where every formula has the
 form
 
     X∧Y∧¬Z
@@ -281,9 +281,9 @@ Checking if a type implements an interface means checking if it is in the set
 described by that interfaces. Which means checking if the corresponding formula
 is satisfied.
 
-And checking if an interface is invalid meant checking if the set it describes
-is empty. Which meant checking if the formula is *satisfiable*. This was easy,
-though, as those formulas are in DNF. They only have a single term and that
+And checking if an interface is invalid means checking if the set it describes
+is empty. Which means checking if the formula is *satisfiable*. This is easy,
+though, as these formulas are in DNF. They only have a single term and that
 term is a conjunction of variables or their negations. And as we noted above,
 solving SAT on a formula given in DNF is easy.
 
@@ -299,13 +299,13 @@ type S interface{
 ```
 
 This represents the set of all types which are in the *union* of the type sets
-`A` and `B` - that is, the set of all types which are in `A` *or* in `B` (or
-both).
+`A` and `B` - that is, it is the set of all types which are in `A` *or* in `B`
+(or both).
 
 This means our language of expressible formulas now also includes a
 `∨`-operator - we have added set unions (`∪`) and set unions are equivalent to
 `∨` in the language of formulas. What's more, the form of our formula is now a
-*Conjunctive* normal form - every line is a term of `∨` and the lines are
+*conjunctive* normal form - every line is a term of `∨` and the lines are
 connected by `∧`:
 
 ```go
