@@ -62,7 +62,7 @@ and ask you to verify that the second is a factor of the first.
 
 These two things are often very different in difficulty. If I ask you to give
 me a factor of 297863737, you probably know no better way than to sit down and
-try to divide it by a lot of numbers and see if they divide it evenly. But if I
+try to divide it by a lot of numbers and see if it comes out evenly. But if I
 ask you to verify that 9883 is a factor of that number, you just have to do a
 bit of long division and it either divides it, or it does not.
 
@@ -85,7 +85,7 @@ that to solve *any other problem in NP*. These problems are called “NP-complet
 That is, to be frank, plain magic and explaining it is far beyond my
 capabilities. But it helps us to tell if a given problem is hard, by doing it
 the other way around. If solving problem X would enable us to solve one of
-these NP-complete problems, than solving problem X is obviously itself NP-complete
+these NP-complete problems, then solving problem X is obviously itself NP-complete
 and therefore *probably very hard*. This is called a “proof by reduction”.
 
 One such problem, which is very often used to prove a problem is hard, is
@@ -382,7 +382,7 @@ That's true, but there are still reasons to care:
   you had trouble figuring out which packages declared the conflicting
   dependencies.
 
-  This is something vrey typical for NP complete problems. As an exact solution
+  This is something very typical for NP complete problems. As an exact solution
   is often too hard to compute, they rely on heuristics and randomization and
   it's hard to work backwards from a failure.
 - It would require to somehow specify how a compiler should implement this
