@@ -56,7 +56,7 @@ The second obvious follow up question is “what's the difference between
 give you a number and ask you to solve the factorization problem, I'm asking
 you to find a (non-trivial) factor of that number.
 
-*Deciding* a problem means that I give you solution and I'm asking you if the
+*Deciding* a problem means that I give you a solution and I'm asking you if the
 solution is correct. For the factorization problem, I'd give you two numbers
 and ask you to verify that the second is a factor of the first.
 
@@ -79,13 +79,13 @@ In practice, though, we usually assume that there are some problems like that.
 
 One fact that helps us talk about hard problems, is that it turns out that
 there are some problems which are *as hard as possible* in NP. That means we
-were able to prove, that if you can solve one of these problems, you can use
+were able to prove that if you can solve one of these problems you can use
 that to solve *any other problem in NP*. These problems are called “NP-complete”.
 
 That is, to be frank, plain magic and explaining it is far beyond my
 capabilities. But it helps us to tell if a given problem is hard, by doing it
 the other way around. If solving problem X would enable us to solve one of
-these NP-complete problems, then solving problem X is obviously itself NP-complete
+these NP-complete problems then solving problem X is obviously itself NP-complete
 and therefore *probably very hard*. This is called a “proof by reduction”.
 
 One such problem, which is very often used to prove a problem is hard, is
@@ -102,9 +102,9 @@ Or, if you are more familiar with programming syntax:
 
     ((!x && y) || z) && (x || !y)
 
-If I give you an assignment to these variable, you can reasonably efficiently
-tell me, if the formula evaluates to `true` or `false`, by substituting them in
-and evaluating the formula. For example
+If I give you an assignment to these variables, you can efficiently tell me, if
+the formula evaluates to `true` or `false`, by substituting them in and
+evaluating the formula. For example
 
     X = true
     Y = false
@@ -116,35 +116,37 @@ and evaluating the formula. For example
                       = true
 
 But if I *only* give you the formula and ask you to *find* an assignment which
-makes it `true` - or if such an assignment exist - you probably have to try out
-all possible assignments to see if any of them does. That's easy for three
-variables, but there are 2<sup>n</sup> possible assignments, so it takes
-*exponential* time in the number of variables.
+makes it `true` - or even to find whether such an assignment exists - you
+probably have to try out all possible assignments to see if any of them does.
+That's easy for three variables, but there are 2<sup>n</sup> possible
+assignments, so it takes *exponential* time in the number of variables.
 
 This problem is called "boolean satisfiability" and it is NP-complete.
 
 It turns out to be extremely important *in what form* the formula is given,
 though. Some forms make it pretty easy to solve, while others make it hard.
 
-For example, every formula has what is called a [“Disjunctive Normal Form”
-(DNF)](https://en.wikipedia.org/wiki/Disjunctive_normal_form), so called
-because it consists of a series of conjunction (“and”) terms, joined together
-by disjunction (“or”) operators[^3]:
+For example, every formula can be rewritten into what is called a [“Disjunctive Normal Form” (DNF)](https://en.wikipedia.org/wiki/Disjunctive_normal_form),
+so called because it consists of a series of conjunction (“and”) terms, joined
+together by disjunction (“or”) operators[^3]:
 
     (X ∧ Z) ∨ (¬Y ∧ Z)
 
 Each term has a subset of the variables, possibly negated, joined by ∧. The
 terms are then joined together using `∨`.
 
-Solving the satisfiability problem for a formula in DNF is obviously very easy:
+Solving the satisfiability problem for a formula in DNF is easy:
 
 1. Go through the individual terms. `∨` is true if and only if either of its
    operands is true, so for each term:
    * If it contains both a variable and its negation (i.e. `X∧¬X`) it can
      never be true, continue to the next term.
-   * Otherwise, you can read an assignment from the term - assign `true`, if
-     the term contains `X` and assign `false`, if it contains `¬X`. The term
-     is then true, so the entire formula is.
+   * Otherwise, you can infer an assignment from the term: If the formula
+     contains `X`, then `X` must be `true`. If it contains `¬X`, then `X` must
+     be `false`. If it contains neither, then the value of `X` does not matter
+     and either value works.
+
+     The term is then true, so the entire formula is.
 2. If none of the terms can be made `true`, the formula can't be made `true`
    and there is no solution.
 
@@ -176,7 +178,7 @@ at all objects for which `f` is `true`:
 
     S[f] := { x∈U | f(x) }
 
-We use the index form `S[f]` to indicate, that `S` depends on the function `f`.
+We use the index form `S[f]` to indicate that `S` depends on the function `f`.
 
 Likewise, if we have any set `S⊆U`, we can create a boolean function from it:
 
@@ -195,8 +197,9 @@ equivalent to logical disjunction `∨`:
 
     f[S](x) ∨ f[T](x) = x∈S ∨ x∈T = x∈(S∪T)
 
-Similarly, `∩` becomes equivalent to `∧`, `⊆` becomes equivalent to `⇒` and `¬`
-becomes equivalent to set complement `U\S := {x∈U | x∉S}`.
+Similarly, `∩` becomes equivalent to `∧`. `¬` becomes equivalent to set
+complement: `S[¬f] = { x∈U | ¬f(x) } = { x∈U | x∉S }`, which we can write as
+`U\S`.
 
 The boolean formulas we looked at in the previous section are a form of these
 boolean functions. They take some boolean arguments and return a boolean, e.g.
@@ -204,9 +207,9 @@ boolean functions. They take some boolean arguments and return a boolean, e.g.
       f: B³ → B
     (X,Y,Z) ↦ ((¬X∧Y)∨Z)∧(X∨¬Y)
 
-It turns out that *every* boolean function with boolean parameters can be
-written as a logical formula - in particular, every such function has a CNF and
-a DNF.
+[It turns out](https://en.wikipedia.org/wiki/Functional_completeness) that *every*
+boolean function with boolean parameters can be written as a logical formula -
+in particular, every such function has a CNF and a DNF.
 
 If we want to do that for other sets (apart from `B^n`, that is), we first have
 to be able to translate it into a set of boolean variables. As we will see,
@@ -214,9 +217,10 @@ this can be easily done in the case we are interested in.
 
 All of this allows us to talk about what we mean by “computing a set is hard”.
 With this equivalency, checking if a given object is in a set becomes the
-*decision* problem of SAT - `x∈S`, exactly if `f[S](x)` evaluates to `true`.
-And checking if a set is empty becomes the *solution* problem of SAT - `S=∅`,
-exactly if `f[S]` is not satisfiable.
+*decision* problem of SAT - deciding if `x∈S` is equivalent to deciding if
+`f[S](x)`evaluates to `true`. And checking if a set is empty becomes the
+*solution* problem of SAT, as it is equivalent to verifying that `f[S]` is not
+satisfiable.
 
 With this, let us look at the specific sets we are interested in.
 
@@ -234,7 +238,7 @@ type S interface {
 
 is “the set of all types which have a method `X()` and a method `Y()` and a method `Z()`”.
 
-We also had a way to express set intersection, using [interface embedding](https://go.dev/ref/spec#Embedded_interfaces):
+We also have a way to express set intersection, using [interface embedding](https://go.dev/ref/spec#Embedded_interfaces):
 
 
 ```go
@@ -259,8 +263,8 @@ type X interface { X() }
 type NotX interface{ X() int }
 ```
 
-This meant that you could express interfaces which could never be satisfied by
-any type (i.e. which described an empty type set):
+This meant that we can express interfaces which could never be satisfied by
+any type (i.e. which describe an empty type set):
 
 ```go
 interface{ X; NotX }
@@ -268,18 +272,19 @@ interface{ X; NotX }
 
 [The compiler rejects such interfaces](https://go.dev/play/p/r4kpXNynscX).
 
-So, we pretty much had a language to build boolean formulas, where every
-formula had the form
+So we had a language to build boolean formulas, where every formula had the
+form
 
     X∧Y∧¬Z
 
-Checking if a type implements an interface meant to check if it is in the set
-described by that interfaces. Which meant checking if the corresponding formula
+Checking if a type implements an interface means checking if it is in the set
+described by that interfaces. Which means checking if the corresponding formula
 is satisfied.
 
 And checking if an interface is invalid meant checking if the set it describes
 is empty. Which meant checking if the formula is *satisfiable*. This was easy,
-though. If you look closely, those formulas are in DNF and as we noted above,
+though, as those formulas are in DNF. They only have a single term and that
+term is a conjunction of variables or their negations. And as we noted above,
 solving SAT on a formula given in DNF is easy.
 
 ## Adding unions
@@ -298,8 +303,10 @@ This represents the set of all types which are in the *union* of the type sets
 both).
 
 This means our language of expressible formulas now also includes a
-`∨`-operator. What's more, the form of our formula is now a *Conjunctive*
-normal form - every line is a term of `∨` and the lines are connected by `∧`:
+`∨`-operator - we have added set unions (`∪`) and set unions are equivalent to
+`∨` in the language of formulas. What's more, the form of our formula is now a
+*Conjunctive* normal form - every line is a term of `∨` and the lines are
+connected by `∧`:
 
 ```go
 type X interface { X() }
@@ -320,8 +327,8 @@ type S interface {
 There is one detail which becomes important here. There are types which
 *neither* implement `X` *nor* do they implement `NotX` - if they don't have an
 `X` method at all, for example. If we want to really prove that calculating
-these new type sets is NP complete, we need to fix that. We want that a type
-set is empty *exactly* if its formula is not satisfiable. Boolean variables are
+these new type sets is NP complete, we need to fix that. We need a type set to
+be empty *exactly* if its formula is not satisfiable. Boolean variables are
 always either `true` or `false`, though.
 
 “Luckily”, our new operator gives us a way to fix that:
@@ -346,7 +353,9 @@ type S interface {
 Now, any type we consider necessarily has either an `X()` or an `X() int`
 method, so either implements `X`, or implements `NotX` (and never both).
 
-So, checking if these general type sets are empty is NP complete.
+So, checking that an interface has an empty type set is equivalent to checking
+that a boolean formula in CNF has no solution. As described above, that is
+NP-complete.
 
 Even worse, as the definition of what operations you can do on a variable of
 type parameter type, [we can show that *even type-checking a generic function*
@@ -373,7 +382,7 @@ That's true, but there are still reasons to care:
 
   This is especially important for environments like the Go playground, which
   regularly compiles untrusted code.
-- NP complete problems are notoriously hard to debug, if they fail.
+- NP complete problems are notoriously hard to debug if they fail.
 
   If you use Linux, you might have occasionally run into a problem where you
   accidentally tried installing conflicting versions of some package. And if
@@ -382,16 +391,20 @@ That's true, but there are still reasons to care:
   you had trouble figuring out which packages declared the conflicting
   dependencies.
 
-  This is something very typical for NP complete problems. As an exact solution
-  is often too hard to compute, they rely on heuristics and randomization and
-  it's hard to work backwards from a failure.
-- It would require to somehow specify how a compiler should implement this
-  check.
-  As an exact solution is not possible, there needs to be some heuristic (even
-  if it is just “give up after a bit”). Which either needs to be put into the
-  language specification, which is very complex, for little benefit. Or
-  we leave it up to the implementation, in which case a program might stop
-  compiling when changing Go compilers.
+  This is typical for NP complete problems. As an exact solution is often too
+  hard to compute, they rely on heuristics and randomization and it's hard to
+  work backwards from a failure.
+- We generally don't want the correctness of a Go program to depend on the
+  compiler used. That is, a program should not suddenly stop compiling because
+  you used a different compiler or the compiler was changed in a new Go
+  version.
+
+  But NP-complete problems don't allow us to calculate an exact solution. They
+  always need some heuristic (even if it is just “give up after a bit”). If we
+  don't want the correctness of a program to be implementation defined, that
+  heuristic must become part of the Go language specification. But these
+  heuristics are very complex to describe. So we would have to spend a lot of
+  room in the spec for something which does not give us a very large benefit.
 
 ## The fix
 
@@ -463,7 +476,7 @@ to provide feedback on either.
   extremely inefficient. n<sup>1000</sup> still grows extremely fast, but is
   polynomial. And for many practical problems, even n<sup>3</sup> is
   intolerably slow. But for complicated reasons, there is a qualitatively
-  important difference between “polynomial” and “exponential”[^10] run time, so
+  important difference between “polynomial” and “exponential”[^6] run time, so
   just trust me, that the distinction makes sense.
 
 [^2]: These names might seem strange, by the way. P is easy to explain: It
@@ -494,5 +507,5 @@ to provide feedback on either.
   That's a problem we'll encounter again in a bit, but for this section it does
   not matter.
 
-[^10]: Yes, I know that there are complexity classes between polynomial and
+[^6]: Yes, I know that there are complexity classes between polynomial and
   exponential. Allow me the simplification.
