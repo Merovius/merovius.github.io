@@ -22,20 +22,36 @@ sentence from the spec](https://go.dev/ref/spec#Operands):
 > Implementation restriction: A compiler need not report an error if an
 > operand's type is a type parameter with an empty type set.
 
+As an example, consider this interface:
+
+```go
+type C interface {
+  int
+  M()
+}
+```
+
+This constraint can never be satisfied. It says that a type has to be *both*
+the predeclared type `int` *and* have a method `M()`. But predeclared
+types in Go do not have any methods. So there is no type satisfying `C` and its
+type set is empty.
+[The compiler accepts it just fine](https://go.dev/play/p/36pFPhJKGxl), though.
+That is what this clause from the spec is about.
+
 This restriction might seem strange to you. After all, if a type set is empty,
-it seems very helpful to report that to the user, because they obviously made a
+it seems very helpful to report that to the user. They obviously made a
 mistake - an empty type set can never be used as a constraint, as the function
 using it could never be instantiated.
 
-I want to explain the reason that sentence is there and also go into a couple
-of related design decisions of the generics design. I'm trying to be expansive
-in my explanation, which means that you should not *need* any special knowledge
-to understand it. It also means, some of the information might be boring to
-you - feel free to skip the corresponding sections.
+I want to explain why that sentence is there and also go into a couple of
+related design decisions of the generics design. I'm trying to be expansive in
+my explanation, which means that you should not need any special knowledge to
+understand it. It also means, some of the information might be boring to you -
+feel free to skip the corresponding sections.
 
-The reason that sentence is in the Go spec, is that it turns out to be hard to
-actually determine if a type set is empty. Hard enough, that the Go team did
-not want to require an implementation to solve that. Let's see why.
+This sentence is in the Go spec because it turns out to be hard to determine if
+a type set is empty. Hard enough, that the Go team did not want to require an
+implementation to solve that. Let's see why.
 
 ## P vs. NP
 
@@ -80,10 +96,10 @@ The reason this is hard to know in general, is that just because *we have not
 found an efficient algorithm to solve a problem*, does not mean there is none.
 In practice, though, we usually assume that there are some problems like that.
 
-One fact that helps us talk about hard problems, is that it turns out that
-there are some problems which are *as hard as possible* in NP. That means we
-were able to prove that if you can solve one of these problems you can use
-that to solve *any other problem in NP*. These problems are called “NP-complete”.
+One fact that helps us talk about hard problems, is that there are some
+problems which are *as hard as possible* in NP. That means we were able to
+prove that if you can solve one of these problems you can use that to solve
+*any other problem in NP*. These problems are called “NP-complete”.
 
 That is, to be frank, plain magic and explaining it is far beyond my
 capabilities. But it helps us to tell if a given problem is hard, by doing it
@@ -190,7 +206,7 @@ by one. In fact, solving satisfiability on CNF (often abbreviated as “CNFSAT�
 is NP-complete[^4].
 
 [It turns out](https://en.wikipedia.org/wiki/Functional_completeness) that
-*every* boolean function can be written as a single expression using only `||`, `&&` and `!`. In particular, every boolean has a DNF and a CNF.
+*every* boolean function can be written as a single expression using only `||`, `&&` and `!`. In particular, every boolean function has a DNF and a CNF.
 
 Very often, when we want to prove a problem is hard, we do so by reducing it to
 CNFSAT. That's what we will do for the problem of calculating type sets. But
@@ -324,7 +340,7 @@ the formula `x && y`.
 Surprisingly, there is also a limited form of negation. It happens implicitly,
 because a type can not have two different methods with the same name. So,
 implicitly, if a type has a method `X()` it does *not* have a method `X()
-int` for example[^6]:
+int` for example:
 
 ```go
 type X interface { X() }
@@ -350,7 +366,7 @@ how can it do that? Did we not say above that checking if a set is empty is
 NP-complete?
 
 The reason this works is that we only have negation and conjunction (`&&`). So,
-all the boolean expressions e can build with this language have the form
+all the boolean expressions we can build with this language have the form
 
 ```go
 x && y && !z
@@ -534,7 +550,7 @@ example, the limitations we introduced to fix all of this made
 impossible to express. We might want to tweak the design to allow this use
 case. In these discussions, we have to look out for this, so we don't
 re-introduce the problem. It took us some time to even detect it
-[when the union operator was proposed](https://github.com/golang/go/issues/45346)a.
+[when the union operator was proposed](https://github.com/golang/go/issues/45346).
 
 And there are other kinds of “implicit negations” in the Go language. For
 example, a `struct` can not have both a field *and* a method with the same
@@ -552,11 +568,12 @@ particular,
 [arnehormann](https://github.com/arnehormann),
 [@johanbrandhorst](https://twitter.com/johanbrandhorst),
 [@mvdan_](https://twitter.com/mvdan_),
+[@_myitcv](https://twitter.com/_myitcv),
 [@readcodesing](https://mobile.twitter.com/readcodesing),
 [@rogpeppe](https://twitter.com/rogpeppe) and
 [@zekjur](https://twitter.com/zekjur).
 
-They took a significant chunk of time and their suggestions where invaluable.
+They took a significant chunk of time and their suggestions were invaluable.
 
 [^1]: It should be pointed out, though, that “polynomial” can still be
     extremely inefficient. \\(n^{1000}\\) still grows extremely fast, but is
