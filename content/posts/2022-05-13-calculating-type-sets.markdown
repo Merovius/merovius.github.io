@@ -8,6 +8,8 @@ summary: I try to explain why the problem of calculating the exact contents of
   a type set in Go is harder than it might seem on the surface.
 ---
 
+<script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+
 Go 1.18 added the biggest and probably one of the most requested features of
 all time to the language: [Generics](https://go.dev/doc/go1.18#generics). If
 you want a comprehensive introduction to the topic, there are many out there
@@ -93,74 +95,120 @@ boolean satisfiability.
 
 ## SAT
 
+<div style="display: none">
+\[
+\def\t{{\mathrm{true}}}
+\def\f{{\mathrm{false}}}
+\def\coloneqq\mathrel{:=}
+\]
+</div>
+
 Imagine I give you a formula. This formula has a bunch of variables, which can
-all be `true` or `false`, joined by logical operators. For example
+all be \\(\t\\) or \\(\f\\), joined by logical operators. For example
 
-    ((¬X∧Y)∨Z)∧(X∨¬Y)
+<div>
+\[
+((\lnot X \land Y) \lor Z) \land (X \lor \lnot Y)
+\]
+</div>
 
-Or, if you are more familiar with programming syntax:
+If you not familiar with this mathematical notation, in Go this would be
+written as
 
-    ((!x && y) || z) && (x || !y)
+```go
+((!x && y) || z) && (x || !y)
+```
+
+- \\(\lnot\\) is the logical negation, in Go written as `!`
+- \\(\land\\) is the logical “and” operator, in Go written as `&&`. Mathematicians sometimes call this “conjunction”.
+- \\(\lor\\) is the logical “or” operator, in Go written as `||`. Mathematicians sometimes call this “disjunction”
 
 If I give you an assignment to these variables, you can efficiently tell me, if
-the formula evaluates to `true` or `false`, by substituting them in and
+the formula evaluates to \\(\t\\) or \\(\f\\), by substituting them in and
 evaluating the formula. For example
 
-    X = true
-    Y = false
-    Z = true
-    ((¬X∧Y)∨Z)∧(X∨¬Y) = ((¬true ∧ false) ∨ true)∧(true ∨ ¬false)
-                      = ((false ∧ false) ∨ true)∧(true ∨ true)
-                      = (false ∨ true) ∧ true
-                      = true ∧ true
-                      = true
+<div>
+\[
+\begin{aligned}
+X &\leftarrow \t \\
+Y &\leftarrow \t \\
+Z &\leftarrow \f \\
+((\lnot X \land Y) \lor Z) \land (X \lor\lnot Y) &= ((\lnot\t\land\t)\lor\f)\land(\t\lor\lnot\t) \\
+  &= ((\f\land\t)\lor\f)\land(\t\lor\lnot\t) \\
+  &= ((\f\land\t)\lor\f)\land(\t\lor\f) \\
+  &= ((\f\land\t)\lor\f)\land\t \\
+  &= (\f\land\t)\lor\f \\
+  &= \f\land\t \\
+  &= \f
+\end{aligned}
+\]
+</div>
+
+This takes at most one step per operator in the formula. So it takes a *linear*
+number of steps in the length of the input, which is very efficient.
 
 But if I *only* give you the formula and ask you to *find* an assignment which
-makes it `true` - or even to find whether such an assignment exists - you
+makes it \\(\t\\) - or even to find out whether such an assignment exists - you
 probably have to try out all possible assignments to see if any of them does.
-That's easy for three variables, but there are 2<sup>n</sup> possible
-assignments, so it takes *exponential* time in the number of variables.
+That's easy for three variables, but for \\(n\\) variables there are \\(2^n\\)
+possible assignments, so it takes *exponential* time in the number of
+variables.
 
-This problem is called "boolean satisfiability" and it is NP-complete.
+The problem of finding an assignment that makes a formula \\(\t\\) (or proving
+that no such assignment exists) is called "boolean satisfiability" and it is
+NP-complete.
 
 It turns out to be extremely important *in what form* the formula is given,
 though. Some forms make it pretty easy to solve, while others make it hard.
 
 For example, every formula can be rewritten into what is called a [“Disjunctive Normal Form” (DNF)](https://en.wikipedia.org/wiki/Disjunctive_normal_form),
-so called because it consists of a series of conjunction (“and”) terms, joined
-together by disjunction (“or”) operators[^3]:
+so called because it consists of a series of “and” (“conjunction”,
+\\(\land\\)) terms, joined together by “or” (“disjunction”, \\(\lor\\))
+operators[^3]:
 
-    (X ∧ Z) ∨ (¬Y ∧ Z)
+<div>
+\[
+(X\land Z)\lor(\lnot Y\land Z)
+\]
+</div>
 
-Each term has a subset of the variables, possibly negated, joined by ∧. The
-terms are then joined together using `∨`.
+(This is the DNF of our example formula above)
+
+Each term has a subset of the variables, possibly negated, joined by
+\\(\land\\). The terms are then joined together using \\(\lor\\).
 
 Solving the satisfiability problem for a formula in DNF is easy:
 
-1. Go through the individual terms. `∨` is true if and only if either of its
-   operands is true, so for each term:
-   * If it contains both a variable and its negation (i.e. `X∧¬X`) it can
-     never be true, continue to the next term.
+1. Go through the individual terms. \\(\lor\\) is \\(\t\\) if and only if
+   either of its operands is \\(\t\\), so for each term:
+   * If it contains both a variable and its negation (\\(X\land\lnot X\\))
+     it can never be \\(\t\\), continue to the next term.
    * Otherwise, you can infer an assignment from the term: If the formula
-     contains `X`, then `X` must be `true`. If it contains `¬X`, then `X` must
-     be `false`. If it contains neither, then the value of `X` does not matter
-     and either value works.
+     contains \\(X\\), then \\(X\\) must be \\(\t\\). If it contains \\(\lnot
+     X\\), then \\(X\\) must be \\(\f\\). If it contains neither, then the
+     value of \\(X\\) does not matter and either value works.
 
-     The term is then true, so the entire formula is.
-2. If none of the terms can be made `true`, the formula can't be made `true`
+     The term is then \\(\t\\), so the entire formula is.
+2. If none of the terms can be made \\(\t\\), the formula can't be made \\(\t\\)
    and there is no solution.
 
-On the other hand, there is also a [“Conjunctive Normal
-Form”](https://en.wikipedia.org/wiki/Conjunctive_normal_form). Here, the
-formula is a series of *disjunction* terms, joined together with a
-*conjunction*:
+On the other hand, there is also a [“Conjunctive Normal Form”
+(CNF)](https://en.wikipedia.org/wiki/Conjunctive_normal_form). Here, the
+formula is a series of “or” (“disjunction”, \\(\lor\\)) terms, joined together
+with “and” (“conjunction”, \\(\land\\)) operators:
 
-    (¬X ∨ Z) ∧ (Y ∨ Z) ∧ (X ∨ ¬Y)
+<div>
+\[
+(\lnot X\lor Z)\land(Y\lor Z)\land(X\lor\lnot Y)
+\]
+</div>
 
-For this, the same idea does not work - you have to take *all terms* into
-account simultaneously, to find an assignment and can't just tackle them one by
-one. In fact, solving satisfiability on CNF (often abbreviated as “CNFSAT”) is
-NP-complete[^4].
+(You can compare this with the DNF above. Both describe the same formula)
+
+For this, the idea of our algorithm does not work. To find a solution, you have
+to take *all terms* into account simultaneously. You can't just tackle them one
+by one. In fact, solving satisfiability on CNF (often abbreviated as “CNFSAT”)
+is NP-complete[^4].
 
 Very often, when we want to prove a problem is hard, we do so by reducing it to
 CNFSAT. That's what we will do for the problem of calculating type sets. But
@@ -170,46 +218,65 @@ there is one more preamble we need.
 
 There is an important relationship between
 [sets](https://en.wikipedia.org/wiki/Set_(mathematics)) and boolean functions
-(functions which return `true` or `false`).
+(functions which return \\(\t\\) or \\(\t\\)).
 
-Say we have some universe of objects `U`. And say we have a boolean function
-`f:U→B` with `B:={true,false}`. We can then create a set from that, by looking
-at all objects for which `f` is `true`:
+Say we have some universe of objects \\(U\\). And let's introduce \\(B\\) as an
+abbreviation of the set \\(\\{\t,\f\\}\\). If we have a boolean function
+\\(f\colon U\to B\\) (a function which takes an element of \\(U\\) and maps it
+to an element of \\(B\\)) we can create a set from that, by looking at all
+objects for which \\(f\\) is \\(\t\\):
 
-    S[f] := { x∈U | f(x) }
+<div>
+\[
+S_f \coloneqq \{ x\in U\colon f(x) \}
+\]
+</div>
 
-We use the index form `S[f]` to indicate that `S` depends on the function `f`.
+You read this as “\\(S\\) index \\(f\\) is defined as the set of all \\(x\\) in
+\\(U\\), for which \\(f\\) of \\(x\\)”. We use the index-notation to indicate
+that the set depends on the function \\(f\\).
 
-Likewise, if we have any set `S⊆U`, we can create a boolean function from it:
+Likewise, if we have any \\(S\subseteqq U\\) (\\(S\\) is a subset of
+\\(U\\)), we can create a boolean function from it:
 
-    f[S]: U → B
-          x ↦ x∈S
+<div>
+\[
+\begin{align}
+f_S\colon U &\to B \\
+x &\mapsto x\in S
+\end{align}
+\]
+</div>
 
-That is, the function returns `true` if an element is in `S` and `false`
-otherwise.
+That is, the function returns \\(\t\\) if an element is in \\(S\\) and \\(\f\\)
+otherwise[^5].
 
-An interesting aspect of this, is that we can translate between boolean
-operators and set operators this way. For example, set union `∪` becomes
-equivalent to logical disjunction `∨`:
+An interesting aspect of this is that we can translate between boolean
+operators and set operators this way:
 
-    S[f] ∪ S[g] = { x∈U | f(x) } ∪ { x∈U | g(x) }
-                = { x∈U | f(x) ∨ g(x) }
-
-    f[S](x) ∨ f[T](x) = x∈S ∨ x∈T = x∈(S∪T)
-
-Similarly, `∩` becomes equivalent to `∧`. `¬` becomes equivalent to set
-complement: `S[¬f] = { x∈U | ¬f(x) } = { x∈U | x∉S }`, which we can write as
-`U\S`.
+- The logical “or” \\(\lor\\) becomes set *union*: \\(S\cup T\\) contains
+  any element which is in \\(S\\) **or** which is in \\(T\\).
+- The logical “and” \\(\land\\) becomes set *intersection*: \\(S\cap T\\)
+  contains any element which is in \\(S\\) **and** which is in \\(T\\).
+- The logical negation \\(\lnot\\) becomes set *complement*: \\(S^c\\) contains
+  any element which is **not** in \\(S\\).
 
 The boolean formulas we looked at in the previous section are a form of these
 boolean functions. They take some boolean arguments and return a boolean, e.g.
 
-      f: B³ → B
-    (X,Y,Z) ↦ ((¬X∧Y)∨Z)∧(X∨¬Y)
+<div>
+\[
+\begin{align}
+f\colon B\times B\times B &\to B \\
+(X,Y,Z)&\mapsto ((\lnot X\land Y)\lor Z)\land(X\lor\lnot Y)
+\end{align}
+\]
+</div>
 
-[It turns out](https://en.wikipedia.org/wiki/Functional_completeness) that *every*
-boolean function with boolean parameters can be written as a logical formula -
-in particular, every such function has a CNF and a DNF.
+[It turns out](https://en.wikipedia.org/wiki/Functional_completeness) that
+*every* boolean function with boolean parameters can be written as a logical
+formula only using \\(\land\\), \\(\lor\\) and \\(\lnot\\) - in particular,
+every such function has a CNF and a DNF.
 
 If we want to do that for other sets (apart from `B^n`, that is), we first have
 to be able to translate it into a set of boolean variables. As we will see,
@@ -256,7 +323,7 @@ method `X()`” as a boolean variable and think of this as the formula `X∧Y`.
 Surprisingly, there is also a simple form of negation. It happens implicitly,
 because a type can not have two different methods with the same name. So,
 implicitly, if a type has a method `X()` it does *not* have a method `X()
-int` for example[^5]:
+int` for example[^6]:
 
 ```go
 type X interface { X() }
@@ -473,39 +540,72 @@ If you do have an algorithm, or a proof, feel free to let me know. I'd be happy
 to provide feedback on either.
 
 [^1]: It should be pointed out, though, that “polynomial” can still be
-  extremely inefficient. n<sup>1000</sup> still grows extremely fast, but is
-  polynomial. And for many practical problems, even n<sup>3</sup> is
-  intolerably slow. But for complicated reasons, there is a qualitatively
-  important difference between “polynomial” and “exponential”[^6] run time, so
-  just trust me, that the distinction makes sense.
+    extremely inefficient. \\(n^{1000}\\) still grows extremely fast, but is
+    polynomial. And for many practical problems, even \\(n^3\\) is
+    intolerably slow. But for complicated reasons, there is a qualitatively
+    important difference between “polynomial” and “exponential”[^7] run time, so
+    you just have to trust me, that the distinction makes sense.
 
 [^2]: These names might seem strange, by the way. P is easy to explain: It
-  stands for “polynomial”. NP doesn't mean “not polynomial”, though. It means
-  “non-deterministic polynomial”. A non-deterministic computer, in this
-  context, is a hypothetical machine which can run arbitrarily many
-  computations simultaneously. A program which can be *decided* efficiently by
-  any computer, can be *solved* efficiently by a non-deterministic one, by just
-  trying out all possible solutions at the same time and returning a correct
-  one. Thus, being able to decide a problem on a normal computer, means being
-  able to solve it on a non-deterministic one.
+    stands for “polynomial”.
+
+    NP doesn't mean “not polynomial”, though. It means “non-deterministic
+    polynomial”. A non-deterministic computer, in this context, is a
+    hypothetical machine which can run arbitrarily many computations
+    simultaneously. A program which can be *decided* efficiently by any
+    computer, can be *solved* efficiently by a non-deterministic one, by just
+    trying out all possible solutions at the same time and returning a correct
+    one. Thus, being able to decide a problem on a normal computer, means being
+    able to solve it on a non-deterministic one.
 
 [^3]: You might complain that it is hard to remember if the “disjunctive normal
-  form” is a disjunction of conjunctions, or a conjunction of disjunctions -
-  and that no one can remember which of these means “and” and which means “or”
-  anyways. You would be correct.
+    form” is a disjunction of conjunctions, or a conjunction of disjunctions -
+    and that no one can remember which of these means “and” and which means “or”
+    anyways.
+
+    You would be correct.
 
 [^4]: You might wonder why we can't just solve CNFSAT by transforming the formula
-  into DNF and solving that. The answer is that the transformation can make the
-  formula exponentially larger. So even though solving the problem on DNF is
-  linear in the size the DNF formula, that size is *exponential* in the size of
-  the CNF formula. So we still use exponential time in the size of the CNF formula.
+    into DNF and solving that.
 
-[^5]: You might notice that this isn't *really* negation. After all, a type
-  might have *neither* the method `X()` *nor* the method `X() int`. So, in the
-  logic language we are building, we don't have
-  [the law of the excluded middle](https://en.wikipedia.org/wiki/Law_of_excluded_middle).
-  That's a problem we'll encounter again in a bit, but for this section it does
-  not matter.
+    The answer is that the transformation can make the formula exponentially
+    larger. So even though solving the problem on DNF is linear in the size the
+    DNF formula, that size is *exponential* in the size of the CNF formula. So
+    we still use exponential time in the size of the CNF formula.
 
-[^6]: Yes, I know that there are complexity classes between polynomial and
-  exponential. Allow me the simplification.
+[^5]: To explain this notation:
+
+    <div>
+    \[
+    \begin{align}
+    f_S\colon U &\to B \\
+    x &\mapsto x\in S
+    \end{align}
+    \]
+    </div>
+
+    - \\(f_S\\) is the name of the function. The index
+    again means that the function depends on the set \\(S\\)).
+    - \\(U\\) is the “input type”
+    - \\(B\\) is the “output type”
+    - On the left of the \\(\mapsto\\) arrow is the name of the parameter
+    - On the right is the “body” of the function
+
+    So in Go this function could be written as
+
+    ```go
+    var s Set[U]
+    f := func(x U) bool {
+      return s.Contains(x)
+    }
+    ```
+
+[^6]: You might notice that this isn't *really* negation. After all, a type
+    might have *neither* the method `X()` *nor* the method `X() int`. So, in the
+    logic language we are building, we don't have
+    [the law of the excluded middle](https://en.wikipedia.org/wiki/Law_of_excluded_middle).
+    That's a problem we'll encounter again in a bit, but for this section it does
+    not matter.
+
+[^7]: Yes, I know that there are complexity classes between polynomial and
+    exponential. Allow me the simplification.
