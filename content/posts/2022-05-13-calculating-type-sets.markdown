@@ -448,7 +448,7 @@ anyone sat down and either
 2. Wrote a proof that the problem is still NP-complete.
 
 The issue is, that doing either of these takes time. I did invest that time in
-the original discussion, before the limitations where introduced and so far, I
+the original discussion, before the limitations were introduced and so far, I
 did not get around to doing it with them in place. Maybe someone else has, or
 will.
 
