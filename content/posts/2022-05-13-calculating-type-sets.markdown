@@ -71,7 +71,8 @@ bit of long division and it either divides it, or it does not.
 It turns out, that every problem which is efficiently *solvable* is also
 efficiently *decidable*. You can just calculate the solution and compare it to
 the given one, if you want to decide it. So, every problem in P is also in
-NP[^2]. But it is [a famously open question](https://en.wikipedia.org/wiki/P_versus_NP_problem)
+NP[^2]. But it is
+[a famously open question](https://en.wikipedia.org/wiki/P_versus_NP_problem)
 whether the opposite is true - that is, we don't really *know*, if there are
 problems which are hard to solve, but easy to decide.
 
@@ -95,120 +96,101 @@ boolean satisfiability.
 
 ## SAT
 
-<div style="display: none">
-\[
-\def\t{{\mathrm{true}}}
-\def\f{{\mathrm{false}}}
-\def\coloneqq\mathrel{:=}
-\]
-</div>
-
-Imagine I give you a formula. This formula has a bunch of variables, which can
-all be \\(\t\\) or \\(\f\\), joined by logical operators. For example
-
-<div>
-\[
-((\lnot X \land Y) \lor Z) \land (X \lor \lnot Y)
-\]
-</div>
-
-If you not familiar with this mathematical notation, in Go this would be
-written as
+Imagine I give you a boolean function. The function has a bunch of `bool`
+arguments and returns `bool`, by joining its arguments with logical operators
+into a single expression. For example:
 
 ```go
-((!x && y) || z) && (x || !y)
+func F(x, y, z bool) bool {
+  return ((!x && y) || z) && (x || !y)
+}
 ```
 
-- \\(\lnot\\) is the logical negation, in Go written as `!`
-- \\(\land\\) is the logical “and” operator, in Go written as `&&`. Mathematicians sometimes call this “conjunction”.
-- \\(\lor\\) is the logical “or” operator, in Go written as `||`. Mathematicians sometimes call this “disjunction”
+If I give you values of these arguments, you can efficiently tell me, if
+the formula evaluates to `true` or `false`, by substituting them in and
+evaluating every operator. For example
 
-If I give you an assignment to these variables, you can efficiently tell me, if
-the formula evaluates to \\(\t\\) or \\(\f\\), by substituting them in and
-evaluating the formula. For example
+```go
+f(true, true, false)
+  → ((!true && true) || false) && (true || !true)
+  → ((false && true) || false) && (true || !true)
+  → ((false && true) || false) && (true || false)
+  → ((false && true) || false) && true
+  →  (false && true) || false
+  →   false && true
+  →   false
+```
 
-<div>
-\[
-\begin{aligned}
-X &\leftarrow \t \\
-Y &\leftarrow \t \\
-Z &\leftarrow \f \\
-((\lnot X \land Y) \lor Z) \land (X \lor\lnot Y) &= ((\lnot\t\land\t)\lor\f)\land(\t\lor\lnot\t) \\
-  &= ((\f\land\t)\lor\f)\land(\t\lor\lnot\t) \\
-  &= ((\f\land\t)\lor\f)\land(\t\lor\f) \\
-  &= ((\f\land\t)\lor\f)\land\t \\
-  &= (\f\land\t)\lor\f \\
-  &= \f\land\t \\
-  &= \f
-\end{aligned}
-\]
-</div>
+This takes at most one step per operator in the expression. So it takes a
+*linear* number of steps in the length of the input, which is very efficient.
 
-This takes at most one step per operator in the formula. So it takes a *linear*
-number of steps in the length of the input, which is very efficient.
+But if I *only* give you the function and ask you to *find* arguments which
+make it return `true` - or even to find out whether such arguments exist - you
+probably have to try out all possible input combinations to see if any of them
+does. That's easy for three arguments, but for \\(n\\) arguments there are
+\\(2^n\\) possible assignments, so it takes *exponential* time in the number of
+arguments.
 
-But if I *only* give you the formula and ask you to *find* an assignment which
-makes it \\(\t\\) - or even to find out whether such an assignment exists - you
-probably have to try out all possible assignments to see if any of them does.
-That's easy for three variables, but for \\(n\\) variables there are \\(2^n\\)
-possible assignments, so it takes *exponential* time in the number of
-variables.
+The problem of finding arguments that makes such a function return `true` (or
+proving that no such arguments exists) is called "boolean satisfiability" and
+it is NP-complete.
 
-The problem of finding an assignment that makes a formula \\(\t\\) (or proving
-that no such assignment exists) is called "boolean satisfiability" and it is
-NP-complete.
-
-It turns out to be extremely important *in what form* the formula is given,
+It turns out to be extremely important *in what form* the expression is given,
 though. Some forms make it pretty easy to solve, while others make it hard.
 
-For example, every formula can be rewritten into what is called a [“Disjunctive Normal Form” (DNF)](https://en.wikipedia.org/wiki/Disjunctive_normal_form),
-so called because it consists of a series of “and” (“conjunction”,
-\\(\land\\)) terms, joined together by “or” (“disjunction”, \\(\lor\\))
-operators[^3]:
+For example, every expression can be rewritten into what is called a
+[“Disjunctive Normal Form” (DNF)](https://en.wikipedia.org/wiki/Disjunctive_normal_form),
+so called because it consists of a series of *conjunction* (`&&`) terms, joined
+together by *disjunction* (`||`) operators[^3]:
 
-<div>
-\[
-(X\land Z)\lor(\lnot Y\land Z)
-\]
-</div>
+```go
+func F_DNF(x, y, z bool) bool {
+  return (x && z) || (!y && z)
+}
+```
 
-(This is the DNF of our example formula above)
+(You can verify that this is the same function as above, by
+[trying out all 8 input combinations](https://go.dev/play/p/dCtSs3tf91F))
 
-Each term has a subset of the variables, possibly negated, joined by
-\\(\land\\). The terms are then joined together using \\(\lor\\).
+Each term has a subset of the arguments, possibly negated, joined by
+`&&`. The terms are then joined together using `||`.
 
-Solving the satisfiability problem for a formula in DNF is easy:
+Solving the satisfiability problem for an expression in DNF is easy:
 
-1. Go through the individual terms. \\(\lor\\) is \\(\t\\) if and only if
-   either of its operands is \\(\t\\), so for each term:
-   * If it contains both a variable and its negation (\\(X\land\lnot X\\))
-     it can never be \\(\t\\), continue to the next term.
-   * Otherwise, you can infer an assignment from the term: If the formula
-     contains \\(X\\), then \\(X\\) must be \\(\t\\). If it contains \\(\lnot
-     X\\), then \\(X\\) must be \\(\f\\). If it contains neither, then the
-     value of \\(X\\) does not matter and either value works.
-
-     The term is then \\(\t\\), so the entire formula is.
-2. If none of the terms can be made \\(\t\\), the formula can't be made \\(\t\\)
-   and there is no solution.
+1. Go through the individual terms. `||` is `true` if and only if
+   either of its operands is `true`, so for each term:
+   * If it contains both an argument and its negation (`x && !x`)
+     it can never be `true`, continue to the next term.
+   * Otherwise, you can infer valid arguments from the term:
+       - If it contains `x`, then we must pass `true` for `x`
+       - If it contains `!x`, then we must pass `false` for `x`
+       - If it contains neither, then what we pass for `x` does not matter and
+         either value works.
+   * The term then evaluates to `true` with these arguments, so the entire
+     expression does.
+2. If none of the terms can be made `true`, the function can never return
+   `true` and there is no valid set of arguments.
 
 On the other hand, there is also a [“Conjunctive Normal Form”
 (CNF)](https://en.wikipedia.org/wiki/Conjunctive_normal_form). Here, the
-formula is a series of “or” (“disjunction”, \\(\lor\\)) terms, joined together
-with “and” (“conjunction”, \\(\land\\)) operators:
+expression is a series of *disjunction* (`||`) terms, joined together with
+*conjunction* (`&&`) operators:
 
-<div>
-\[
-(\lnot X\lor Z)\land(Y\lor Z)\land(X\lor\lnot Y)
-\]
-</div>
+```go
+func F_CNF(x, y, z bool) bool {
+  return (!x || z) && (y || z) && (x || !y)
+}
+```
 
-(You can compare this with the DNF above. Both describe the same formula)
+(Again, you can [verify that this is the same function](https://go.dev/play/p/0xldLVGqu7m))
 
 For this, the idea of our algorithm does not work. To find a solution, you have
 to take *all terms* into account simultaneously. You can't just tackle them one
 by one. In fact, solving satisfiability on CNF (often abbreviated as “CNFSAT”)
 is NP-complete[^4].
+
+[It turns out](https://en.wikipedia.org/wiki/Functional_completeness) that
+*every* boolean function can be written as a single expression using only `||`, `&&` and `!`. In particular, every boolean has a DNF and a CNF.
 
 Very often, when we want to prove a problem is hard, we do so by reducing it to
 CNFSAT. That's what we will do for the problem of calculating type sets. But
@@ -217,77 +199,95 @@ there is one more preamble we need.
 ## Sets and Satisfiability
 
 There is an important relationship between
-[sets](https://en.wikipedia.org/wiki/Set_(mathematics)) and boolean functions
-(functions which return \\(\t\\) or \\(\t\\)).
+[sets](https://en.wikipedia.org/wiki/Set_(mathematics)) and boolean functions.
 
-Say we have some universe of objects \\(U\\). And let's introduce \\(B\\) as an
-abbreviation of the set \\(\\{\t,\f\\}\\). If we have a boolean function
-\\(f\colon U\to B\\) (a function which takes an element of \\(U\\) and maps it
-to an element of \\(B\\)) we can create a set from that, by looking at all
-objects for which \\(f\\) is \\(\t\\):
+Say we have a type `T` and a `Universe` which contains all possible values of
+`T`. If we have a `func(T) bool`, we can create a set from that, by looking at
+all objects for which the function returns `true`:
 
-<div>
-\[
-S_f \coloneqq \{ x\in U\colon f(x) \}
-\]
-</div>
+```go
+var Universe Set[T]
 
-You read this as “\\(S\\) index \\(f\\) is defined as the set of all \\(x\\) in
-\\(U\\), for which \\(f\\) of \\(x\\)”. We use the index-notation to indicate
-that the set depends on the function \\(f\\).
+func MakeSet(f func(T) bool) Set[T] {
+  s := make(Set[T])
+  for v := range Universe {
+    if f(v) {
+      s.Add(v)
+    }
+  }
+  return s
+}
+```
 
-Likewise, if we have any \\(S\subseteqq U\\) (\\(S\\) is a subset of
-\\(U\\)), we can create a boolean function from it:
+This set contains exactly all elements for which `f` is `true`. So calculating
+`f(v)` is equivalent to checking `s.Contains(f)`. And checking if `s` is empty
+is equivalent to checking if `f` can ever return `true`.
 
-<div>
-\[
-\begin{align}
-f_S\colon U &\to B \\
-x &\mapsto x\in S
-\end{align}
-\]
-</div>
+We can also go the other way around:
 
-That is, the function returns \\(\t\\) if an element is in \\(S\\) and \\(\f\\)
-otherwise[^5].
+```go
+func MakeFunc(s Set[T]) func(T) bool {
+  return func(v T) bool {
+    return s.Contains(v)
+  }
+}
+```
 
-An interesting aspect of this is that we can translate between boolean
-operators and set operators this way:
+So in a sense `func(T) bool` and `Set[T]` are “the same thing”. We can
+transform a question about one into a question about the other and back.
 
-- The logical “or” \\(\lor\\) becomes set *union*: \\(S\cup T\\) contains
-  any element which is in \\(S\\) **or** which is in \\(T\\).
-- The logical “and” \\(\land\\) becomes set *intersection*: \\(S\cap T\\)
-  contains any element which is in \\(S\\) **and** which is in \\(T\\).
-- The logical negation \\(\lnot\\) becomes set *complement*: \\(S^c\\) contains
-  any element which is **not** in \\(S\\).
+As with observed above it is important *how* a boolean function is given.
+To take that into account we have to also convert boolean operators into set
+operations:
 
-The boolean formulas we looked at in the previous section are a form of these
-boolean functions. They take some boolean arguments and return a boolean, e.g.
+```go
+// Union(s, t) contains all elements which are in s *or* in t.
+func Union(s, t Set[T]) Set[T] {
+  return MakeSet(func(v T) bool {
+    return s.Contains(v) || t.Contains(v)
+  })
+}
 
-<div>
-\[
-\begin{align}
-f\colon B\times B\times B &\to B \\
-(X,Y,Z)&\mapsto ((\lnot X\land Y)\lor Z)\land(X\lor\lnot Y)
-\end{align}
-\]
-</div>
+// Intersect(s, t) contains all elements which are in s *and* in t.
+func Intersect(s, t Set[T]) Set[T] {
+  return MakeSet(func(v T) bool {
+    return s.Contains(v) && t.Contains(v)
+  })
+}
 
-[It turns out](https://en.wikipedia.org/wiki/Functional_completeness) that
-*every* boolean function with boolean parameters can be written as a logical
-formula only using \\(\land\\), \\(\lor\\) and \\(\lnot\\) - in particular,
-every such function has a CNF and a DNF.
+// Complement(s) contains all elements which are *not* in s.
+func Complement(s Set[T]) Set[T] {
+  return MakeSet(func(v T) bool {
+    return !s.Contains(v)
+  })
+}
+```
 
-If we want to do that for other sets (apart from `B^n`, that is), we first have
-to be able to translate it into a set of boolean variables. As we will see,
-this can be easily done in the case we are interested in.
+And back:
 
-All of this allows us to talk about what we mean by “computing a set is hard”.
-With this equivalency, checking if a given object is in a set becomes the
-*decision* problem of SAT - deciding if `x∈S` is equivalent to deciding if
-`f[S](x)` evaluates to `true`. And checking if a set is empty becomes the
-*solution* problem of SAT, as it is equivalent to verifying that `f[S]` is not
-satisfiable.
+```go
+// Or returns a function which returns if f or g is true.
+func Or(f, g func(T) bool) func(T) bool {
+  return MakeFunc(Union(MakeSet(f), MakeSet(g)))
+}
+
+// And returns a function which returns if f and g are true.
+func And(f, g func(T) bool) func(T) bool {
+  return MakeFunc(Intersect(MakeSet(f), MakeSet(g)))
+}
+
+// Not returns a function which returns if f is false
+func Not(f func(T) bool) func(T) bool {
+  return MakeFunc(Complement(MakeSet(f)))
+}
+```
+
+The takeaway from all of this is that constructing a set using `Union`,
+`Intersect` and `Complement` is really the same as writing a boolean function
+using `||`, `&&` and `!`.
+
+And proving that a set constructed in this way is empty is the same as proving
+that a corresponding boolean function is never `true`.
 
 With this, let us look at the specific sets we are interested in.
 
@@ -303,10 +303,10 @@ type S interface {
 }
 ```
 
-is “the set of all types which have a method `X()` and a method `Y()` and a method `Z()`”.
+is “the set of all types which have a method `X()` and a method `Y()` and a
+method `Z()`”.
 
 We can also express set intersection, using [interface embedding](https://go.dev/ref/spec#Embedded_interfaces):
-
 
 ```go
 type S interface { X() }
@@ -317,10 +317,11 @@ type U interface {
 }
 ```
 
-This expresses `U=S∩T` as an interface. Or we can view the predicate “has a
-method `X()`” as a boolean variable and think of this as the formula `X∧Y`.
+This expresses the intersection of `S` and `T` as an interface. Or we can view
+the property “has a method `X()`” as a boolean variable and think of this as
+the formula `x && y`.
 
-Surprisingly, there is also a simple form of negation. It happens implicitly,
+Surprisingly, there is also a limited form of negation. It happens implicitly,
 because a type can not have two different methods with the same name. So,
 implicitly, if a type has a method `X()` it does *not* have a method `X()
 int` for example[^6]:
@@ -330,29 +331,38 @@ type X interface { X() }
 type NotX interface{ X() int }
 ```
 
-This means that we can express interfaces which could never be satisfied by
-any type (i.e. which describe an empty type set):
+There is a small snag: A type can have *neither* a method `X()` *nor* have a
+method `X() int`. That's why our negation operator is limited. Real boolean
+variables are always *either* `true` *or* `false`, whereas our negation also
+allows them to be neither. In mathematics we say that this logic language lacks
+[the law of the excluded middle](https://en.wikipedia.org/wiki/Law_of_excluded_middle)
+(also called “Tertium Non Datur” - “there is no third”). For this section, that does not matter. But we have to worry about it later.
+
+Because we have intersection and negation, we can express interfaces which
+could never be satisfied by any type (i.e. which describe an empty type set):
 
 ```go
 interface{ X; NotX }
 ```
 
-[The compiler rejects such interfaces](https://go.dev/play/p/r4kpXNynscX).
+[The compiler rejects such interfaces](https://go.dev/play/p/r4kpXNynscX). But
+how can it do that? Did we not say above that checking if a set is empty is
+NP-complete?
 
-So we have a language to build boolean formulas, where every formula has the
-form
+The reason this works is that we only have negation and conjunction (`&&`). So,
+all the boolean expressions e can build with this language have the form
 
-    X∧Y∧¬Z
+```go
+x && y && !z
+```
 
-Checking if a type implements an interface means checking if it is in the set
-described by that interfaces. Which means checking if the corresponding formula
-is satisfied.
+These expressions are in DNF! We have a term, which contains a couple of
+variables - possibly negated - and joins them together using `&&`. We don't
+have `||`, so there is only a single term.
 
-And checking if an interface is invalid means checking if the set it describes
-is empty. Which means checking if the formula is *satisfiable*. This is easy,
-though, as these formulas are in DNF. They only have a single term and that
-term is a conjunction of variables or their negations. And as we noted above,
-solving SAT on a formula given in DNF is easy.
+Solving satisfiability in DNF is easy, as we said. So with the language as we
+have described it so far, we can only express type sets which are easy to check
+for emptiness.
 
 ## Adding unions
 
@@ -370,10 +380,10 @@ This represents the set of all types which are in the *union* of the type sets
 (or both).
 
 This means our language of expressible formulas now also includes a
-`∨`-operator - we have added set unions (`∪`) and set unions are equivalent to
-`∨` in the language of formulas. What's more, the form of our formula is now a
-*conjunctive* normal form - every line is a term of `∨` and the lines are
-connected by `∧`:
+`||`-operator - we have added set unions and set unions are equivalent to
+`||` in the language of formulas. What's more, the form of our formula is now a
+*conjunctive* normal form - every line is a term of `||` and the lines are
+connected by `&&`:
 
 ```go
 type X interface { X() }
@@ -383,7 +393,7 @@ type NotY interface{ Y() int }
 type Z interface { Z() }
 type NotZ interface{ Z() int }
 
-// (¬X ∨ Z) ∧ (Y ∨ Z) ∧ (X ∨ ¬Y)
+// (!x || z) && (y || z) && (x || !y)
 type S interface {
     NotX | Z
     Y | Z
@@ -391,14 +401,13 @@ type S interface {
 }
 ```
 
-There is one detail which becomes important here. There are types which
-*neither* implement `X` *nor* do they implement `NotX` - if they don't have an
-`X` method at all, for example. If we want to really prove that calculating
-these new type sets is NP complete, we need to fix that. We need a type set to
-be empty *exactly* if its formula is not satisfiable. Boolean variables are
-always either `true` or `false`, though.
+This is not *quite* enough to prove NP-completeness though, because of the snag
+above. If we want to prove that it is easy, it does not matter that a type can
+have neither method. But if we want to prove that it is hard, we really need an
+*exact* equivalence between boolean functions and type sets. So we need to
+guarantee that a type has one of our two contradictory methods.
 
-“Luckily”, our new operator gives us a way to fix that:
+“Luckily”, the `|` operator gives us a way to fix that:
 
 ```go
 type TertiumNonDatur interface {
@@ -407,7 +416,7 @@ type TertiumNonDatur interface {
     Z | NotZ
 }
 
-// (¬X ∨ Z) ∧ (Y ∨ Z) ∧ (X ∨ ¬Y)
+// (!x || z) && (y || z) && (x || !y)
 type S interface {
     TertiumNonDatur
 
@@ -417,35 +426,41 @@ type S interface {
 }
 ```
 
-Now, any type we consider necessarily has either an `X()` or an `X() int`
-method, so either implements `X`, or implements `NotX` (and never both).
+Now any type which could possibly implement `S` *must* have either an `X()` or
+an `X() int` method, because it must implement `TertiumNonDatur` as well. So,
+this extra interface helps us to get the law of the excluded middle into our
+language of type sets.
 
-So, checking that an interface has an empty type set is equivalent to checking
-that a boolean formula in CNF has no solution. As described above, that is
-NP-complete.
+With this, checking if a type set is empty is in general as hard as checking if
+an arbitrary boolean formula in CNF has no solution. As described above, that
+is NP-complete.
 
-Even worse, as the definition of what operations you can do on a variable of
-type parameter type, [we can show that *even type-checking a generic function*
-is NP-complete](https://github.com/golang/go/issues/45346#issuecomment-822330394)
-with this language.
+Even worse, we want to define which operations are allowed on a type parameter
+by saying that it is allowed if every type in a type set supports it. However,
+[that check is also NP-complete](https://github.com/golang/go/issues/45346#issuecomment-822330394).
+
+The easy way to prove that is to observe that if a type set is empty, *every
+operator* should be allowed on a type parameter constrained by it. Because any
+statement about “every element of the empty set“ is true[^5].
+
+But this would mean that type-checking a generic function would be NP-complete.
+If an operator is used, we have to at least check if the type set of its
+constraint is empty. Which is NP-complete.
 
 ## Why do we care?
 
-A fair question is “why do we even care? Surely these cases are super exotic
-and in any real program, checking this is trivial”.
+A fair question is “why do we even care? Surely these cases are super exotic.
+In any real program, checking this is trivial”.
 
 That's true, but there are still reasons to care:
 
-- We still have to at least *talk about* type sets, because they also define
-  the set of valid operations on a type parameter constrained by it. We still
-  have to be sure that we can do all the necessary computations in the type
-  checker.
 - Go has the goal of having a fast compiler. And importantly, one which is
   guaranteed to be fast *for any program*. If I give you a Go program, you can
   be reasonably sure that it compiles quickly, in a time frame predictable by
   the size of the input.
 
-  If I *can* craft a program which compiles slowly, this is no longer true.
+  If I *can* craft a program which compiles slowly - and may take longer than
+  the lifetime of the universe - this is no longer true.
 
   This is especially important for environments like the Go playground, which
   regularly compiles untrusted code.
@@ -473,6 +488,15 @@ That's true, but there are still reasons to care:
   heuristics are very complex to describe. So we would have to spend a lot of
   room in the spec for something which does not give us a very large benefit.
 
+Note that Go also decided to restrict the version constraints a `go.mod` file
+can express, [for exactly the same reasons](https://research.swtch.com/version-sat).
+Go has a clear priority, not to require too complicated algorithms in its
+compilers and tooling. Not because they are hard to implement, but because the
+behavior of complicated algorithms also tends to be hard to understand for
+humans.
+
+So, clearly, requiring to solve an NP-complete problem is out of the question.
+
 ## The fix
 
 Given that there must not be an NP-complete problem in the language
@@ -491,59 +515,54 @@ We can no longer express our `TertiumNonDatur` type, or the individual `|`
 terms of the formula, as the respective terms specify methods. Without
 specifying methods, we can't get our “implicit negation” to work either.
 
-There are a couple of other restrictions which are arguably at least touching
-on these problem, but I won't got into them here.
+The hope is that this change (among a couple of others) is sufficient to ensure
+that we can always calculate type sets accurately. Which means I pulled a bit
+of a bait-and-switch: I said that calculating type sets is hard. But as they
+actually exist, they *might not be*.
 
-Ultimately, the fix was to restrict the language so that hard to manage
-interfaces could no longer be expressed to begin with.
+The reason I wrote this blog post anyways is to explain the *kind of problems*
+that exist in this area. It is easy to say we have solved this problem
+[once and for all](https://www.youtube.com/watch?v=0SYpUSjSgFg).
 
-## What now?
+But to be certain, someone should *prove* this - either by writing a proof like
+this post, that the problem is still hard, or by writing an algorithm which
+solves it efficiently.
 
-Maybe you noticed a bit of a bait-and-switch I pulled. Originally, I said that
-I'm going to explain why the Go compiler does not complain about empty type
-sets. I claimed that checking that is NP-complete. But in the last section, I
-told you that the NP-completeness problem was fixed. Could the compiler
-complain after all?
+There are also still discussions about changing the generics design. As one
+example, the limitations we introduced to fix all of this made
+[one of the use cases from the design doc](https://go.googlesource.com/proposal/+/refs/heads/master/design/43651-type-parameters.md#interface-types-in-union-elements)
+impossible to express. We might want to tweak the design to allow this use
+case. In these discussions, we have to look out for this, so we don't
+re-introduce the problem. It took us some time to even detect it
+[when the union operator was proposed](https://github.com/golang/go/issues/45346)a.
 
-To the best of my knowledge, the answer is “we don't know yet”. It is entirely
-possible that with these restrictions, we would efficiently implement that
-check. My intuition is, that it should be possible. But I am not aware that
-anyone sat down and either
+And there are other kinds of “implicit negations” in the Go language. For
+example, a `struct` can not have both a field *and* a method with the same
+name. Or being one type implies not being another type (so `interface{int}`
+implicitly negates `interface{string}`).
 
-1. Wrote an algorithm to prove that a type set is empty, thus proving that it
-   can be done efficiently. Or
-2. Wrote a proof that the problem is still NP-complete.
+All of which is to say that even if the problem might no longer be
+NP-complete - I hope that I convinced you it is still more complicated than you
+might have thought.
 
-The issue is, that doing either of these takes time. I did invest that time in
-the original discussion, before the limitations were introduced and so far, I
-did not get around to doing it with them in place. Maybe someone else has, or
-will.
+---
 
-Personally, I'm not sure there is a huge incentive, though. If you write a
-constraint with an accidentally empty type set, even the most rudimentary
-testing will expose that, as a function using it can not be instantiated and
-thus not used. And even *if* you made such a mistake, fixing it would then not
-even be a breaking change - as no one could ever use that function anyways.
+I want to thank my beta-readers for helping me improve this article. In
+particular,
+[arnehormann](https://github.com/arnehormann),
+[@johanbrandhorst](https://twitter.com/johanbrandhorst),
+[@mvdan_](https://twitter.com/mvdan_),
+[@readcodesing](https://mobile.twitter.com/readcodesing),
+[@rogpeppe](https://twitter.com/rogpeppe) and
+[@zekjur](https://twitter.com/zekjur).
 
-I also feel that all of this hints at a deeper problem with the concepts of
-type sets. There are a couple of more or less arbitrary restrictions in place.
-Arguably, too many: The
-[design doc contains an example use case](https://go.googlesource.com/proposal/+/refs/heads/master/design/43651-type-parameters.md#interface-types-in-union-elements)
-which [no longer works](https://go.dev/play/p/mwdmdgKg6pj).
-
-To me, such restrictions indicate a wrong approach from the start. For example,
-perhaps we could have instead made the extension to the interface syntax in a
-way that type sets are given in DNF, instead of CNF. Or perhaps we should not
-have introduced `|` in the first place.
-
-If you do have an algorithm, or a proof, feel free to let me know. I'd be happy
-to provide feedback on either.
+They took a significant chunk of time and their suggestions where invaluable.
 
 [^1]: It should be pointed out, though, that “polynomial” can still be
     extremely inefficient. \\(n^{1000}\\) still grows extremely fast, but is
     polynomial. And for many practical problems, even \\(n^3\\) is
     intolerably slow. But for complicated reasons, there is a qualitatively
-    important difference between “polynomial” and “exponential”[^7] run time, so
+    important difference between “polynomial” and “exponential”[^6] run time, so
     you just have to trust me, that the distinction makes sense.
 
 [^2]: These names might seem strange, by the way. P is easy to explain: It
@@ -560,7 +579,7 @@ to provide feedback on either.
 
 [^3]: You might complain that it is hard to remember if the “disjunctive normal
     form” is a disjunction of conjunctions, or a conjunction of disjunctions -
-    and that no one can remember which of these means “and” and which means “or”
+    and that no one can remember which of these means `&&` and which means `||`
     anyways.
 
     You would be correct.
@@ -573,39 +592,16 @@ to provide feedback on either.
     DNF formula, that size is *exponential* in the size of the CNF formula. So
     we still use exponential time in the size of the CNF formula.
 
-[^5]: To explain this notation:
+[^5]: This is called [the principle of explosion](https://en.wikipedia.org/wiki/Principle_of_explosion)
+    or “ex falso quodlibet” (“from falsehoold follows anything”).
 
-    <div>
-    \[
-    \begin{align}
-    f_S\colon U &\to B \\
-    x &\mapsto x\in S
-    \end{align}
-    \]
-    </div>
+    Many people - including many first year math students - have anxieties and
+    confusion around this principle and feel that it makes no sense. So I have
+    little hope that I can make it palatable to you. But it is extremely
+    important for mathematics to “work” and it really *is* the most reasonable
+    way to set things up.
 
-    - \\(f_S\\) is the name of the function. The index
-    again means that the function depends on the set \\(S\\)).
-    - \\(U\\) is the “input type”
-    - \\(B\\) is the “output type”
-    - On the left of the \\(\mapsto\\) arrow is the name of the parameter
-    - On the right is the “body” of the function
+    Sorry.
 
-    So in Go this function could be written as
-
-    ```go
-    var s Set[U]
-    f := func(x U) bool {
-      return s.Contains(x)
-    }
-    ```
-
-[^6]: You might notice that this isn't *really* negation. After all, a type
-    might have *neither* the method `X()` *nor* the method `X() int`. So, in the
-    logic language we are building, we don't have
-    [the law of the excluded middle](https://en.wikipedia.org/wiki/Law_of_excluded_middle).
-    That's a problem we'll encounter again in a bit, but for this section it does
-    not matter.
-
-[^7]: Yes, I know that there are complexity classes between polynomial and
+[^6]: Yes, I know that there are complexity classes between polynomial and
     exponential. Allow me the simplification.
