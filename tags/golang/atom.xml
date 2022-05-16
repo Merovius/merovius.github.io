@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">golang on Mero's Blog</title><link href="https://blog.merovius.de/tags/golang/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/golang/atom.xml"/><updated>2022-05-16T18:34:50+00:00</updated><id>https://blog.merovius.de/tags/golang/</id><author><name>Axel Wagner</name></author><entry><title type="html">Calculating type sets is harder than you think</title><link href="https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/</id><published>2022-05-16T09:33:10+00:00</published><updated>2022-05-16T09:33:10+00:00</updated><content type="html"><![CDATA[<script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">golang on Mero's Blog</title><link href="https://blog.merovius.de/tags/golang/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/golang/atom.xml"/><updated>2022-05-16T19:14:48+00:00</updated><id>https://blog.merovius.de/tags/golang/</id><author><name>Axel Wagner</name></author><entry><title type="html">Calculating type sets is harder than you think</title><link href="https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/</id><published>2022-05-16T09:33:10+00:00</published><updated>2022-05-16T09:33:10+00:00</updated><content type="html"><![CDATA[<script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"></script>
 <p>Go 1.18 added the biggest and probably one of the most requested features of
 all time to the language: <a href="https://go.dev/doc/go1.18#generics">Generics</a>. If
 you want a comprehensive introduction to the topic, there are many out there
@@ -39,18 +39,18 @@ into two big classes:</p>
 <ol>
 <li>Problems which can be <em>solved</em> reasonably efficiently. This class is called
 P.</li>
-<li>Problems which can be <em>decided</em> reasonably efficiently. This class is called
+<li>Problems which can be <em>verified</em> reasonably efficiently. This class is called
 NP.</li>
 </ol>
 <p>The first obvious follow up question is “what does ‘reasonably efficient’
 mean?”. The answer to that is “there is an algorithm with a running time
 polynomial in its input size”<sup id="fnref:1"><a href="#fn:1" class="footnote-ref" role="doc-noteref">1</a></sup>.</p>
 <p>The second obvious follow up question is “what&rsquo;s the difference between
-‘solving’ and ‘deciding’?”.</p>
+‘solving’ and ‘verifying’?”.</p>
 <p><em>Solving</em> a problem means what you think it means: Finding a solution. If I
 give you a number and ask you to solve the factorization problem, I&rsquo;m asking
 you to find a (non-trivial) factor of that number.</p>
-<p><em>Deciding</em> a problem means that I give you a solution and I&rsquo;m asking you if the
+<p><em>Verifying</em> a problem means that I give you a solution and I&rsquo;m asking you if the
 solution is correct. For the factorization problem, I&rsquo;d give you two numbers
 and ask you to verify that the second is a factor of the first.</p>
 <p>These two things are often very different in difficulty. If I ask you to give
@@ -59,11 +59,11 @@ try to divide it by a lot of numbers and see if it comes out evenly. But if I
 ask you to verify that 9883 is a factor of that number, you just have to do a
 bit of long division and it either divides it, or it does not.</p>
 <p>It turns out, that every problem which is efficiently <em>solvable</em> is also
-efficiently <em>decidable</em>. You can just calculate the solution and compare it to
+efficiently <em>verifiable</em>. You can just calculate the solution and compare it to
 the given one. So every problem in P is also in NP<sup id="fnref:2"><a href="#fn:2" class="footnote-ref" role="doc-noteref">2</a></sup>. But it is
 <a href="https://en.wikipedia.org/wiki/P_versus_NP_problem">a famously open question</a>
 whether the opposite is true - that is, we don&rsquo;t really <em>know</em>, if there are
-problems which are hard to solve but easy to decide.</p>
+problems which are hard to solve but easy to verify.</p>
 <p>This is hard to know in general. Because us not having <em>found</em> an efficient
 algorithm to solve a problem does not mean <em>there is none</em>. But in practice we
 usually assume that there are some problems like that.</p>
@@ -458,13 +458,13 @@ stands for “polynomial”.</p>
 <p>NP doesn&rsquo;t mean “not polynomial” though. It means “non-deterministic
 polynomial”. A non-deterministic computer, in this context, is a
 hypothetical machine which can run arbitrarily many computations
-simultaneously. A program which can be <em>decided</em> efficiently by any
+simultaneously. A program which can be <em>verified</em> efficiently by any
 computer can be <em>solved</em> efficiently by a non-deterministic one. It just
 tries out all possible solutions at the same time and returns a correct
 one.</p>
-<p>Thus, being able to decide a problem on a normal computer means being
+<p>Thus, being able to verify a problem on a normal computer means being
 able to solve it on a non-deterministic one. That is why the two
-definitions of NP “decidable by a classical computer” and “solvable by a
+definitions of NP “verify by a classical computer” and “solvable by a
 non-deterministic computer” mean the same thing.&#160;<a href="#fnref:2" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
 </li>
 <li id="fn:3" role="doc-endnote">
