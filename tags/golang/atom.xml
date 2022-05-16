@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">golang on Mero's Blog</title><link href="https://blog.merovius.de/tags/golang/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/golang/atom.xml"/><updated>2022-05-16T19:14:48+00:00</updated><id>https://blog.merovius.de/tags/golang/</id><author><name>Axel Wagner</name></author><entry><title type="html">Calculating type sets is harder than you think</title><link href="https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/</id><published>2022-05-16T09:33:10+00:00</published><updated>2022-05-16T09:33:10+00:00</updated><content type="html"><![CDATA[<script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">golang on Mero's Blog</title><link href="https://blog.merovius.de/tags/golang/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/golang/atom.xml"/><updated>2022-05-16T20:09:47+00:00</updated><id>https://blog.merovius.de/tags/golang/</id><author><name>Axel Wagner</name></author><entry><title type="html">Calculating type sets is harder than you think</title><link href="https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/</id><published>2022-05-16T09:33:10+00:00</published><updated>2022-05-16T09:33:10+00:00</updated><content type="html"><![CDATA[<script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"></script>
 <p>Go 1.18 added the biggest and probably one of the most requested features of
 all time to the language: <a href="https://go.dev/doc/go1.18#generics">Generics</a>. If
 you want a comprehensive introduction to the topic, there are many out there
@@ -156,9 +156,9 @@ by one. In fact, solving satisfiability on CNF (often abbreviated as â€œCNFSATâ€
 is NP-complete<sup id="fnref:4"><a href="#fn:4" class="footnote-ref" role="doc-noteref">4</a></sup>.</p>
 <p><a href="https://en.wikipedia.org/wiki/Functional_completeness">It turns out</a> that
 <em>every</em> boolean function can be written as a single expression using only <code>||</code>, <code>&amp;&amp;</code> and <code>!</code>. In particular, every boolean function has a DNF and a CNF.</p>
-<p>Very often, when we want to prove a problem is hard, we do so by reducing it to
-CNFSAT. That&rsquo;s what we will do for the problem of calculating type sets. But
-there is one more preamble we need.</p>
+<p>Very often, when we want to prove a problem is hard, we do so by reducing
+CNFSAT to it. That&rsquo;s what we will do for the problem of calculating type sets.
+But there is one more preamble we need.</p>
 <h2 id="sets-and-satisfiability">Sets and Satisfiability</h2>
 <p>There is an important relationship between
 <a href="https://en.wikipedia.org/wiki/Set_(mathematics)">sets</a> and boolean functions.</p>
