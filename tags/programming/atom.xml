@@ -1,4 +1,336 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">programming on Mero's Blog</title><link href="https://blog.merovius.de/tags/programming/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/programming/atom.xml"/><updated>2022-05-23T16:04:37+00:00</updated><id>https://blog.merovius.de/tags/programming/</id><author><name>Axel Wagner</name></author><entry><title type="html">Calculating type sets is harder than you think</title><link href="https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/</id><published>2022-05-16T09:33:10+00:00</published><updated>2022-05-16T09:33:10+00:00</updated><content type="html"><![CDATA[<script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">programming on Mero's Blog</title><link href="https://blog.merovius.de/tags/programming/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/programming/atom.xml"/><updated>2022-05-23T17:37:54+00:00</updated><id>https://blog.merovius.de/tags/programming/</id><author><name>Axel Wagner</name></author><entry><title type="html">Operator constraints in Go</title><link href="https://blog.merovius.de/posts/2022-05-23-operator-constraints/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-05-23-operator-constraints/</id><published>2022-05-23T17:34:00+00:00</published><updated>2022-05-23T17:34:00+00:00</updated><content type="html"><![CDATA[<p>Let&rsquo;s say you want to implement a sorting function in Go. Or perhaps a data
+structure like a
+<a href="https://en.wikipedia.org/wiki/Binary_search_tree">binary search tree</a>,
+providing ordered access to its elements. Because you want your code to be
+re-usable and type safe, you want to use type parameters. So you need a way to
+order user-provided types.</p>
+<p>There are multiple methods of doing that, with different trade-offs. Let&rsquo;s talk
+about four in particular here:</p>
+<ol>
+<li><code>constraints.Ordered</code></li>
+<li>A method constraint</li>
+<li>Taking a comparison function</li>
+<li>Comparator types</li>
+</ol>
+<h2 id="constraintsordered"><code>constraints.Ordered</code></h2>
+<p>Go 1.18 has a mechanism to constrain a type parameter to all types which have
+the <code>&lt;</code> operator defined on them. The types which have this operator are
+exactly all types whose underlying type is <code>string</code> or one of the predeclared
+integer and float types. So we can write a type set expressing that:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Integer</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="err">~</span><span class="kt">int</span> <span class="p">|</span> <span class="err">~</span><span class="kt">int8</span> <span class="p">|</span> <span class="err">~</span><span class="kt">int16</span> <span class="p">|</span> <span class="err">~</span><span class="kt">int32</span> <span class="p">|</span> <span class="err">~</span><span class="kt">int64</span> <span class="p">|</span> <span class="err">~</span><span class="kt">uint</span> <span class="p">|</span> <span class="err">~</span><span class="kt">uint8</span> <span class="p">|</span> <span class="err">~</span><span class="kt">uint16</span> <span class="p">|</span> <span class="err">~</span><span class="kt">uint32</span> <span class="p">|</span> <span class="err">~</span><span class="kt">uint64</span> <span class="p">|</span> <span class="err">~</span><span class="kt">uintptr</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Float</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="err">~</span><span class="kt">float32</span> <span class="p">|</span> <span class="err">~</span><span class="kt">float64</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Ordered</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">Integer</span> <span class="p">|</span> <span class="nx">Float</span> <span class="p">|</span> <span class="err">~</span><span class="kt">string</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>Because that&rsquo;s a fairly common thing to want to do,
+<a href="https://pkg.go.dev/golang.org/x/exp/constraints#Ordered">there is already a package which contains these kinds of type sets</a>.</p>
+<p>With this, you can write the signature of your sorting function or the
+definition of your search tree as:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">Sort</span><span class="p">[</span><span class="nx">T</span> <span class="nx">constraints</span><span class="p">.</span><span class="nx">Ordered</span><span class="p">](</span><span class="nx">s</span> <span class="p">[]</span><span class="nx">T</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// …
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">SearchTree</span><span class="p">[</span><span class="nx">T</span> <span class="nx">constraints</span><span class="p">.</span><span class="nx">Ordered</span><span class="p">]</span> <span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// …
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span></code></pre></div><p>The main advantage of this is that it works directly with predeclared types and
+simple types like <code>time.Duration</code>. It also is very clear.</p>
+<p>The main disadvantage is that it does not allow composite types like <code>struct</code>s.
+And what if a user want a different sorting order than the one implied by <code>&lt;</code>?
+For example if they want to reverse the order or want specialized string
+collation. A multimedia library might want to sort “The Expanse” under E. And
+some letters sort differently depending on the language setting.</p>
+<p><code>constraints.Ordered</code> is simple, but it also is inflexible.</p>
+<h2 id="method-constraints">Method constraints</h2>
+<p>We can use method constraints to allow more flexibility. This allows a user to
+implement whatever sorting order they want as a method on their type.</p>
+<p>We can write that constraint like this:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Lesser</span><span class="p">[</span><span class="nx">T</span> <span class="nx">any</span><span class="p">]</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// Less returns if the receiver is less than v.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="nf">Less</span><span class="p">(</span><span class="nx">v</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>The type parameter is necessary because we have to refer to the receiver type
+itself in the <code>Less</code> method. This is hopefully clearer when we look at how this
+is used:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">Sort</span><span class="p">[</span><span class="nx">T</span> <span class="nx">Lesser</span><span class="p">[</span><span class="nx">T</span><span class="p">]](</span><span class="nx">s</span> <span class="p">[]</span><span class="nx">T</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// …
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">SearchTree</span><span class="p">[</span><span class="nx">T</span> <span class="nx">Lesser</span><span class="p">[</span><span class="nx">T</span><span class="p">]](</span><span class="nx">s</span> <span class="p">[]</span><span class="nx">T</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// …
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span></code></pre></div><p>This allows the user of our library to customize the sorting order by defining
+a new type with a <code>Less</code> method:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">ReverseInt</span> <span class="kt">int</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">i</span> <span class="nx">ReverseInt</span><span class="p">)</span> <span class="nf">Less</span><span class="p">(</span><span class="nx">j</span> <span class="nx">ReverseInt</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="nx">j</span> <span class="p">&lt;</span> <span class="nx">i</span> <span class="c1">// order is reversed
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span></code></pre></div><p>The disadvantage of this is that it requires some boiler plate on part of your
+user. Using a custom sorting order always requires defining a type with a method.</p>
+<p>They can&rsquo;t use your code with predeclared types like <code>int</code> or <code>string</code> but
+always have to wrap it into a new type.</p>
+<p>Likewise if a type already has a natural comparison method but it is not
+called <code>Less</code>. For example <code>time.Time</code> is naturally sorted by
+<code>time.Time.Before</code>. For cases like that there needs to be a wrapper to rename
+the method.</p>
+<p>Whenever one of these wrappings happens your user might have to convert back
+and forth when passing data to or from your code.</p>
+<p>It also is a little bit more confusing than <code>constraints.Ordered</code>, as your user
+has to understand the purpose of the extra type parameter on <code>Lesser</code>.</p>
+<h2 id="passing-a-comparison-function">Passing a comparison function</h2>
+<p>A simple way to get flexibility is to have the user pass us a function used for
+comparison directly:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">Sort</span><span class="p">[</span><span class="nx">T</span> <span class="nx">any</span><span class="p">](</span><span class="nx">s</span> <span class="p">[]</span><span class="nx">T</span><span class="p">,</span> <span class="nx">less</span> <span class="kd">func</span><span class="p">(</span><span class="nx">T</span><span class="p">,</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// …
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">SearchTree</span><span class="p">[</span><span class="nx">T</span> <span class="nx">any</span><span class="p">]</span> <span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">Less</span> <span class="kd">func</span><span class="p">(</span><span class="nx">T</span><span class="p">,</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// …
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">NewSearchTree</span><span class="p">(</span><span class="nx">less</span> <span class="kd">func</span><span class="p">(</span><span class="nx">T</span><span class="p">,</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span><span class="p">)</span> <span class="o">*</span><span class="nx">SearchTree</span><span class="p">[</span><span class="nx">T</span><span class="p">]</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// …
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">return</span> <span class="o">&amp;</span><span class="nx">SearchTree</span><span class="p">[</span><span class="nx">T</span><span class="p">]{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">Less</span><span class="p">:</span> <span class="nx">less</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// …
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>This essentially abandons the idea of type constraints altogether. Our code
+works with <em>any</em> type and we directly pass around the custom behavior as
+<code>func</code>s. Type parameters are only used to ensure that the arguments to those
+<code>func</code>s are compatible.</p>
+<p>The advantage of this is maximum flexibility. Any type which already has a
+<code>Less</code> method like above can simply be used with this directly by using
+<a href="https://go.dev/ref/spec#Method_expressions">method expressions</a>. Regardless of
+how the method is actually named:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">a</span> <span class="o">:=</span> <span class="p">[]</span><span class="nx">time</span><span class="p">.</span><span class="nx">Time</span><span class="p">{</span> <span class="cm">/* … */</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="nf">Sort</span><span class="p">(</span><span class="nx">a</span><span class="p">,</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Time</span><span class="p">.</span><span class="nx">Before</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>There is also no boilerplate needed to customize sorting behavior:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">a</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">int</span><span class="p">{</span><span class="mi">42</span><span class="p">,</span><span class="mi">23</span><span class="p">,</span><span class="mi">1337</span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="nf">Sort</span><span class="p">(</span><span class="nx">a</span><span class="p">,</span> <span class="kd">func</span><span class="p">(</span><span class="nx">i</span><span class="p">,</span> <span class="nx">j</span> <span class="kt">int</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="nx">j</span> <span class="p">&lt;</span> <span class="nx">i</span> <span class="c1">// reversed order
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="p">})</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>And you can provide helpers for common customizations:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">Reversed</span><span class="p">[</span><span class="nx">T</span> <span class="nx">any</span><span class="p">](</span><span class="nx">less</span> <span class="kd">func</span><span class="p">(</span><span class="nx">T</span><span class="p">,</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span><span class="p">)</span> <span class="p">(</span><span class="nx">greater</span> <span class="kd">func</span><span class="p">(</span><span class="nx">T</span><span class="p">,</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="kd">func</span><span class="p">(</span><span class="nx">a</span><span class="p">,</span> <span class="nx">b</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span> <span class="k">return</span> <span class="nf">less</span><span class="p">(</span><span class="nx">b</span><span class="p">,</span> <span class="nx">a</span><span class="p">)</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>This approach is arguably also more correct than the one above because it
+decouples the type from the comparison used. If I use a <code>SearchTree</code> as a set
+datatype, there is no real reason why the elements in the set would be specific
+to the comparison used. It should be “a set of <code>string</code>” not “a set of
+<code>MyCustomlyOrderedString</code>”. This reflects the fact that with the method
+constraint, we have to convert back-and-forth when putting things into the
+container or taking it out again.</p>
+<p>The main <em>disadvantage</em> of this approach is that it means you can not have
+useful zero values. Your <code>SearchTree</code> type needs the <code>Less</code> field to be
+populated to work. So its zero value can not be used to represent an empty set.</p>
+<p>You cannot even lazily initialize it (which is a common trick to make types
+which need initialization have a useful zero value) because <em>you don&rsquo;t know
+what it should be</em>.</p>
+<h2 id="comparator-types">Comparator types</h2>
+<p>There is a way to pass a function “statically”. That is, instead of passing
+around a <code>func</code> value, we can pass it as a type argument. The way to do that is
+to attach it as a method to a <code>struct{}</code> type:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kn">import</span> <span class="s">&#34;golang.org/x/exp/slices&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">IntComparator</span> <span class="kd">struct</span><span class="p">{}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">IntComparator</span><span class="p">)</span> <span class="nf">Less</span><span class="p">(</span><span class="nx">a</span><span class="p">,</span> <span class="nx">b</span> <span class="kt">int</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="nx">a</span> <span class="p">&lt;</span> <span class="nx">b</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">a</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">int</span><span class="p">{</span><span class="mi">42</span><span class="p">,</span><span class="mi">23</span><span class="p">,</span><span class="mi">1337</span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">less</span> <span class="o">:=</span> <span class="nx">IntComparator</span><span class="p">{}.</span><span class="nx">Less</span> <span class="c1">// has type func(int, int) bool
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="nx">slices</span><span class="p">.</span><span class="nf">SortFunc</span><span class="p">(</span><span class="nx">a</span><span class="p">,</span> <span class="nx">less</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>Based on this, we can devise a mechanism to allow custom comparisons:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// Comparator is a helper type used to compare two T values.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">type</span> <span class="nx">Comparator</span><span class="p">[</span><span class="nx">T</span> <span class="nx">any</span><span class="p">]</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="err">~</span><span class="kd">struct</span><span class="p">{}</span>
+</span></span><span class="line"><span class="cl">  <span class="nf">Less</span><span class="p">(</span><span class="nx">a</span><span class="p">,</span> <span class="nx">b</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">Sort</span><span class="p">[</span><span class="nx">C</span> <span class="nx">Comparator</span><span class="p">[</span><span class="nx">T</span><span class="p">],</span> <span class="nx">T</span> <span class="nx">any</span><span class="p">](</span><span class="nx">a</span> <span class="p">[]</span><span class="nx">T</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="kd">var</span> <span class="nx">c</span> <span class="nx">C</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">less</span> <span class="o">:=</span> <span class="nx">c</span><span class="p">.</span><span class="nx">Less</span> <span class="c1">// has type func(T, T) bool
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="c1">// …
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">SearchTree</span><span class="p">[</span><span class="nx">C</span> <span class="nx">Comparator</span><span class="p">[</span><span class="nx">T</span><span class="p">],</span> <span class="nx">T</span> <span class="nx">any</span><span class="p">]</span> <span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="c1">// …
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span></code></pre></div><p>The <code>~struct{}</code> constraints any implementation of <code>Comparator[T]</code> to have
+underlying type <code>struct{}</code>. It is not strictly necessary, but it serves two
+purposes here:</p>
+<ol>
+<li>It makes clear that <code>Comparator[T]</code> itself is not supposed to carry any
+state. It only exists to have its method called.</li>
+<li>It ensures (as much as possible) that the zero value of <code>C</code> is safe to use.
+In particular, <code>Comparator[T]</code> would be a normal interface type. And it
+would have a <code>Less</code> method of the right type, so it would implement itself.
+But a zero <code>Comparator[T]</code> is <code>nil</code> and would always panic, if its method is
+called.</li>
+</ol>
+<p>An implication of this is that it is not possible to have a <code>Comparator[T]</code>
+which uses an arbitrary <code>func</code> value. The <code>Less</code> method can not rely on having
+access to a <code>func</code> to call, for this approach to work.</p>
+<p>But you can provide other helpers. This can also be used to combine this approach
+with the above ones:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">LessOperator</span><span class="p">[</span><span class="nx">T</span> <span class="nx">constraints</span><span class="p">.</span><span class="nx">Ordered</span><span class="p">]</span> <span class="kd">struct</span><span class="p">{}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">LessOperator</span><span class="p">[</span><span class="nx">T</span><span class="p">])</span> <span class="nf">Less</span><span class="p">(</span><span class="nx">a</span><span class="p">,</span> <span class="nx">b</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="nx">a</span> <span class="p">&lt;</span> <span class="nx">b</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">LessMethod</span><span class="p">[</span><span class="nx">T</span> <span class="nx">Lesser</span><span class="p">[</span><span class="nx">T</span><span class="p">]]</span> <span class="kd">struct</span><span class="p">{}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">LessMethod</span><span class="p">[</span><span class="nx">T</span><span class="p">])</span> <span class="nf">Less</span><span class="p">(</span><span class="nx">a</span><span class="p">,</span> <span class="nx">b</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="nx">a</span><span class="p">.</span><span class="nf">Less</span><span class="p">(</span><span class="nx">b</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Reversed</span><span class="p">[</span><span class="nx">C</span> <span class="nx">Comparator</span><span class="p">[</span><span class="nx">T</span><span class="p">],</span> <span class="nx">T</span> <span class="nx">any</span><span class="p">]</span> <span class="kd">struct</span><span class="p">{}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">Reversed</span><span class="p">[</span><span class="nx">C</span><span class="p">,</span> <span class="nx">T</span><span class="p">])</span> <span class="nf">Less</span><span class="p">(</span><span class="nx">a</span><span class="p">,</span> <span class="nx">b</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="kd">var</span> <span class="nx">c</span> <span class="nx">C</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="nx">c</span><span class="p">.</span><span class="nf">Less</span><span class="p">(</span><span class="nx">b</span><span class="p">,</span> <span class="nx">a</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>The advantage of this approach is that it makes the zero value of
+<code>SearchTree[C, T]</code> useful. For example, a <code>SearchTree[LessOperator[int], int]</code>
+can be used directly, without extra initialization.</p>
+<p>It also carries over the advantage of decoupling the comparison from the
+element type, which we got from accepting comparison functions.</p>
+<p>One disadvantage is that the comparator can never be inferred. It always has to
+be specified in the instantiation explicitly<sup id="fnref:1"><a href="#fn:1" class="footnote-ref" role="doc-noteref">1</a></sup>. That&rsquo;s similar to how we
+always had to pass a <code>less</code> function explicitly above.</p>
+<p>Another disadvantage is that this <em>always</em> requires defining a type for
+comparisons. Where with the comparison function we could define customizations
+(like reversing the order) inline with a <code>func</code> literal, this mechanism always
+requires a method.</p>
+<p>Lastly, this is arguably too clever for its own good. Understanding the purpose
+and idea behind the <code>Comparator</code> type is likely to trip up your users when
+reading the documentation.</p>
+<h2 id="summary">Summary</h2>
+<p>We are left with these trade-offs:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>constraints.Ordered</code></th>
+<th><code>Lesser[T]</code></th>
+<th><code>func(T,T) bool</code></th>
+<th><code>Comparator[T]</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Predeclared types</td>
+<td>👍</td>
+<td>👎</td>
+<td>👎</td>
+<td>👎</td>
+</tr>
+<tr>
+<td>Composite types</td>
+<td>👎</td>
+<td>👍</td>
+<td>👍</td>
+<td>👍</td>
+</tr>
+<tr>
+<td>Custom order</td>
+<td>👎</td>
+<td>👍</td>
+<td>👍</td>
+<td>👍</td>
+</tr>
+<tr>
+<td>Reversal helpers</td>
+<td>👍</td>
+<td>👎</td>
+<td>👍</td>
+<td>👍</td>
+</tr>
+<tr>
+<td>Type boilerplate</td>
+<td>👍</td>
+<td>👎</td>
+<td>👍</td>
+<td>👎</td>
+</tr>
+<tr>
+<td>Useful zero value</td>
+<td>👍</td>
+<td>👍</td>
+<td>👎</td>
+<td>👍</td>
+</tr>
+<tr>
+<td>Type inference</td>
+<td>👍</td>
+<td>👍</td>
+<td>👍</td>
+<td>👎</td>
+</tr>
+<tr>
+<td>Coupled Type/Order</td>
+<td>👎</td>
+<td>👎</td>
+<td>👍</td>
+<td>👍</td>
+</tr>
+<tr>
+<td>Clarity</td>
+<td>👍</td>
+<td>🤷<sup id="fnref:2"><a href="#fn:2" class="footnote-ref" role="doc-noteref">2</a></sup></td>
+<td>👍</td>
+<td>👎</td>
+</tr>
+</tbody>
+</table>
+<p>One thing standing out in this table is that there is no way to <em>both</em> support
+predeclared types <em>and</em> support user defined types.</p>
+<p>It would be great if there was a way to support multiple of these mechanisms
+using the same code. That is, it would be great if we could write something
+like</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// Ordered is a constraint to allow a type to be sorted.
+</span></span></span><span class="line"><span class="cl"><span class="c1">// If a Less method is present, it has precedent.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">type</span> <span class="nx">Ordered</span><span class="p">[</span><span class="nx">T</span> <span class="nx">any</span><span class="p">]</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">constraints</span><span class="p">.</span><span class="nx">Ordered</span> <span class="p">|</span> <span class="nx">Lesser</span><span class="p">[</span><span class="nx">T</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>Unfortunately, allowing this
+<a href="https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/">is harder than one might think</a>.</p>
+<p>Until then, you might want to provide multiple APIs to allow your users more
+flexibility. The standard library currently seems to be converging on providing
+a <code>constraints.Ordered</code> version and a comparison function version.  The latter
+gets a <code>Func</code> suffix to the name. See
+<a href="https://pkg.go.dev/golang.org/x/exp/slices">the experimental <code>slices</code> package</a>
+for an example.</p>
+<section class="footnotes" role="doc-endnotes">
+<hr>
+<ol>
+<li id="fn:1" role="doc-endnote">
+<p>Though as we put the <code>Comparator[T]</code> type parameter first, we can infer
+<code>T</code> from the <code>Comparator</code>.&#160;<a href="#fnref:1" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:2" role="doc-endnote">
+<p>It&rsquo;s a <em>little</em> bit worse, but probably fine.&#160;<a href="#fnref:2" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+</ol>
+</section>
+]]></content></entry><entry><title type="html">Calculating type sets is harder than you think</title><link href="https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/</id><published>2022-05-16T09:33:10+00:00</published><updated>2022-05-16T09:33:10+00:00</updated><content type="html"><![CDATA[<script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"></script>
 <p>Go 1.18 added the biggest and probably one of the most requested features of
 all time to the language: <a href="https://go.dev/doc/go1.18#generics">Generics</a>. If
 you want a comprehensive introduction to the topic, there are many out there
