@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">Mero's Blog</title><link href="https://blog.merovius.de/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/atom.xml"/><updated>2022-05-17T15:05:23+00:00</updated><id>https://blog.merovius.de/</id><author><name>Axel Wagner</name></author><entry><title type="html">Calculating type sets is harder than you think</title><link href="https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/</id><published>2022-05-16T09:33:10+00:00</published><updated>2022-05-16T09:33:10+00:00</updated><content type="html"><![CDATA[<script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">Mero's Blog</title><link href="https://blog.merovius.de/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/atom.xml"/><updated>2022-05-23T15:52:28+00:00</updated><id>https://blog.merovius.de/</id><author><name>Axel Wagner</name></author><entry><title type="html">Calculating type sets is harder than you think</title><link href="https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/</id><published>2022-05-16T09:33:10+00:00</published><updated>2022-05-16T09:33:10+00:00</updated><content type="html"><![CDATA[<script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"></script>
 <p>Go 1.18 added the biggest and probably one of the most requested features of
 all time to the language: <a href="https://go.dev/doc/go1.18#generics">Generics</a>. If
 you want a comprehensive introduction to the topic, there are many out there
@@ -11,10 +11,10 @@ sentence from the spec</a>:</p>
 operand&rsquo;s type is a type parameter with an empty type set.</p>
 </blockquote>
 <p>As an example, consider this interface:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">C</span> <span style="color:#66d9ef">interface</span> {
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">int</span>
-</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">M</span>()
-</span></span><span style="display:flex;"><span>}
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">C</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="kt">int</span>
+</span></span><span class="line"><span class="cl">  <span class="nf">M</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><p>This constraint can never be satisfied. It says that a type has to be <em>both</em>
 the predeclared type <code>int</code> <em>and</em> have a method <code>M()</code>. But predeclared
 types in Go do not have any methods. So there is no type satisfying <code>C</code> and its
@@ -82,20 +82,20 @@ often to prove a problem is hard.</p>
 <p>Imagine I give you a boolean function. The function has a bunch of <code>bool</code>
 arguments and returns <code>bool</code>, by joining its arguments with logical operators
 into a single expression. For example:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">F</span>(<span style="color:#a6e22e">x</span>, <span style="color:#a6e22e">y</span>, <span style="color:#a6e22e">z</span> <span style="color:#66d9ef">bool</span>) <span style="color:#66d9ef">bool</span> {
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> ((!<span style="color:#a6e22e">x</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#a6e22e">y</span>) <span style="color:#f92672">||</span> <span style="color:#a6e22e">z</span>) <span style="color:#f92672">&amp;&amp;</span> (<span style="color:#a6e22e">x</span> <span style="color:#f92672">||</span> !<span style="color:#a6e22e">y</span>)
-</span></span><span style="display:flex;"><span>}
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">F</span><span class="p">(</span><span class="nx">x</span><span class="p">,</span> <span class="nx">y</span><span class="p">,</span> <span class="nx">z</span> <span class="kt">bool</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="p">((!</span><span class="nx">x</span> <span class="o">&amp;&amp;</span> <span class="nx">y</span><span class="p">)</span> <span class="o">||</span> <span class="nx">z</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="p">(</span><span class="nx">x</span> <span class="o">||</span> <span class="p">!</span><span class="nx">y</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><p>If I give you values for these arguments, you can efficiently tell me if the
 formula evaluates to <code>true</code> or <code>false</code>. You just substitute them in and
 evaluate every operator. For example</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#a6e22e">f</span>(<span style="color:#66d9ef">true</span>, <span style="color:#66d9ef">true</span>, <span style="color:#66d9ef">false</span>)
-</span></span><span style="display:flex;"><span>  <span style="color:#960050;background-color:#1e0010">→</span> ((!<span style="color:#66d9ef">true</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#66d9ef">true</span>) <span style="color:#f92672">||</span> <span style="color:#66d9ef">false</span>) <span style="color:#f92672">&amp;&amp;</span> (<span style="color:#66d9ef">true</span> <span style="color:#f92672">||</span> !<span style="color:#66d9ef">true</span>)
-</span></span><span style="display:flex;"><span>  <span style="color:#960050;background-color:#1e0010">→</span> ((<span style="color:#66d9ef">false</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#66d9ef">true</span>) <span style="color:#f92672">||</span> <span style="color:#66d9ef">false</span>) <span style="color:#f92672">&amp;&amp;</span> (<span style="color:#66d9ef">true</span> <span style="color:#f92672">||</span> !<span style="color:#66d9ef">true</span>)
-</span></span><span style="display:flex;"><span>  <span style="color:#960050;background-color:#1e0010">→</span> ((<span style="color:#66d9ef">false</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#66d9ef">true</span>) <span style="color:#f92672">||</span> <span style="color:#66d9ef">false</span>) <span style="color:#f92672">&amp;&amp;</span> (<span style="color:#66d9ef">true</span> <span style="color:#f92672">||</span> <span style="color:#66d9ef">false</span>)
-</span></span><span style="display:flex;"><span>  <span style="color:#960050;background-color:#1e0010">→</span> ((<span style="color:#66d9ef">false</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#66d9ef">true</span>) <span style="color:#f92672">||</span> <span style="color:#66d9ef">false</span>) <span style="color:#f92672">&amp;&amp;</span> <span style="color:#66d9ef">true</span>
-</span></span><span style="display:flex;"><span>  <span style="color:#960050;background-color:#1e0010">→</span>  (<span style="color:#66d9ef">false</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#66d9ef">true</span>) <span style="color:#f92672">||</span> <span style="color:#66d9ef">false</span>
-</span></span><span style="display:flex;"><span>  <span style="color:#960050;background-color:#1e0010">→</span>   <span style="color:#66d9ef">false</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#66d9ef">true</span>
-</span></span><span style="display:flex;"><span>  <span style="color:#960050;background-color:#1e0010">→</span>   <span style="color:#66d9ef">false</span>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="nf">f</span><span class="p">(</span><span class="kc">true</span><span class="p">,</span> <span class="kc">true</span><span class="p">,</span> <span class="kc">false</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="err">→</span> <span class="p">((!</span><span class="kc">true</span> <span class="o">&amp;&amp;</span> <span class="kc">true</span><span class="p">)</span> <span class="o">||</span> <span class="kc">false</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="p">(</span><span class="kc">true</span> <span class="o">||</span> <span class="p">!</span><span class="kc">true</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="err">→</span> <span class="p">((</span><span class="kc">false</span> <span class="o">&amp;&amp;</span> <span class="kc">true</span><span class="p">)</span> <span class="o">||</span> <span class="kc">false</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="p">(</span><span class="kc">true</span> <span class="o">||</span> <span class="p">!</span><span class="kc">true</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="err">→</span> <span class="p">((</span><span class="kc">false</span> <span class="o">&amp;&amp;</span> <span class="kc">true</span><span class="p">)</span> <span class="o">||</span> <span class="kc">false</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="p">(</span><span class="kc">true</span> <span class="o">||</span> <span class="kc">false</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="err">→</span> <span class="p">((</span><span class="kc">false</span> <span class="o">&amp;&amp;</span> <span class="kc">true</span><span class="p">)</span> <span class="o">||</span> <span class="kc">false</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="kc">true</span>
+</span></span><span class="line"><span class="cl">  <span class="err">→</span>  <span class="p">(</span><span class="kc">false</span> <span class="o">&amp;&amp;</span> <span class="kc">true</span><span class="p">)</span> <span class="o">||</span> <span class="kc">false</span>
+</span></span><span class="line"><span class="cl">  <span class="err">→</span>   <span class="kc">false</span> <span class="o">&amp;&amp;</span> <span class="kc">true</span>
+</span></span><span class="line"><span class="cl">  <span class="err">→</span>   <span class="kc">false</span>
 </span></span></code></pre></div><p>This takes at most one step per operator in the expression. So it takes a
 <em>linear</em> number of steps in the length of the input, which is very efficient.</p>
 <p>But if I <em>only</em> give you the function and ask you to <em>find</em> arguments which
@@ -113,9 +113,9 @@ forms make it pretty easy to solve, while others make it hard.</p>
 <a href="https://en.wikipedia.org/wiki/Disjunctive_normal_form">“Disjunctive Normal Form” (DNF)</a>.
 It is called that because it consists of a series of <em>conjunction</em> (<code>&amp;&amp;</code>)
 terms, joined together by <em>disjunction</em> (<code>||</code>) operators<sup id="fnref:3"><a href="#fn:3" class="footnote-ref" role="doc-noteref">3</a></sup>:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">F_DNF</span>(<span style="color:#a6e22e">x</span>, <span style="color:#a6e22e">y</span>, <span style="color:#a6e22e">z</span> <span style="color:#66d9ef">bool</span>) <span style="color:#66d9ef">bool</span> {
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> (<span style="color:#a6e22e">x</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#a6e22e">z</span>) <span style="color:#f92672">||</span> (!<span style="color:#a6e22e">y</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#a6e22e">z</span>)
-</span></span><span style="display:flex;"><span>}
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">F_DNF</span><span class="p">(</span><span class="nx">x</span><span class="p">,</span> <span class="nx">y</span><span class="p">,</span> <span class="nx">z</span> <span class="kt">bool</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="p">(</span><span class="nx">x</span> <span class="o">&amp;&amp;</span> <span class="nx">z</span><span class="p">)</span> <span class="o">||</span> <span class="p">(!</span><span class="nx">y</span> <span class="o">&amp;&amp;</span> <span class="nx">z</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><p>(You can verify that this is the same function as above, by
 <a href="https://go.dev/play/p/dCtSs3tf91F">trying out all 8 input combinations</a>)</p>
 <p>Each term has a subset of the arguments, possibly negated, joined by
@@ -146,9 +146,9 @@ expression does.</li>
 (CNF)</a>. Here, the
 expression is a series of <em>disjunction</em> (<code>||</code>) terms, joined together with
 <em>conjunction</em> (<code>&amp;&amp;</code>) operators:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">F_CNF</span>(<span style="color:#a6e22e">x</span>, <span style="color:#a6e22e">y</span>, <span style="color:#a6e22e">z</span> <span style="color:#66d9ef">bool</span>) <span style="color:#66d9ef">bool</span> {
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> (!<span style="color:#a6e22e">x</span> <span style="color:#f92672">||</span> <span style="color:#a6e22e">z</span>) <span style="color:#f92672">&amp;&amp;</span> (<span style="color:#a6e22e">y</span> <span style="color:#f92672">||</span> <span style="color:#a6e22e">z</span>) <span style="color:#f92672">&amp;&amp;</span> (<span style="color:#a6e22e">x</span> <span style="color:#f92672">||</span> !<span style="color:#a6e22e">y</span>)
-</span></span><span style="display:flex;"><span>}
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">F_CNF</span><span class="p">(</span><span class="nx">x</span><span class="p">,</span> <span class="nx">y</span><span class="p">,</span> <span class="nx">z</span> <span class="kt">bool</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="p">(!</span><span class="nx">x</span> <span class="o">||</span> <span class="nx">z</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="p">(</span><span class="nx">y</span> <span class="o">||</span> <span class="nx">z</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="p">(</span><span class="nx">x</span> <span class="o">||</span> <span class="p">!</span><span class="nx">y</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><p>(Again, you can <a href="https://go.dev/play/p/0xldLVGqu7m">verify that this is the same function</a>)</p>
 <p>For this, the idea of our algorithm does not work. To find a solution, you have
 to take <em>all terms</em> into account simultaneously. You can&rsquo;t just tackle them one
@@ -165,66 +165,66 @@ But there is one more preamble we need.</p>
 <p>Say we have a type <code>T</code> and a <code>Universe</code> which contains all possible values of
 <code>T</code>. If we have a <code>func(T) bool</code>, we can create a set from that, by looking at
 all objects for which the function returns <code>true</code>:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">var</span> <span style="color:#a6e22e">Universe</span> <span style="color:#a6e22e">Set</span>[<span style="color:#a6e22e">T</span>]
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">MakeSet</span>(<span style="color:#a6e22e">f</span> <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">T</span>) <span style="color:#66d9ef">bool</span>) <span style="color:#a6e22e">Set</span>[<span style="color:#a6e22e">T</span>] {
-</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">s</span> <span style="color:#f92672">:=</span> make(<span style="color:#a6e22e">Set</span>[<span style="color:#a6e22e">T</span>])
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">for</span> <span style="color:#a6e22e">v</span> <span style="color:#f92672">:=</span> <span style="color:#66d9ef">range</span> <span style="color:#a6e22e">Universe</span> {
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">f</span>(<span style="color:#a6e22e">v</span>) {
-</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">s</span>.<span style="color:#a6e22e">Add</span>(<span style="color:#a6e22e">v</span>)
-</span></span><span style="display:flex;"><span>    }
-</span></span><span style="display:flex;"><span>  }
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">s</span>
-</span></span><span style="display:flex;"><span>}
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">var</span> <span class="nx">Universe</span> <span class="nx">Set</span><span class="p">[</span><span class="nx">T</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">MakeSet</span><span class="p">(</span><span class="nx">f</span> <span class="kd">func</span><span class="p">(</span><span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span><span class="p">)</span> <span class="nx">Set</span><span class="p">[</span><span class="nx">T</span><span class="p">]</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">s</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="nx">Set</span><span class="p">[</span><span class="nx">T</span><span class="p">])</span>
+</span></span><span class="line"><span class="cl">  <span class="k">for</span> <span class="nx">v</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">Universe</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="nf">f</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">      <span class="nx">s</span><span class="p">.</span><span class="nf">Add</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="nx">s</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><p>This set contains exactly all elements for which <code>f</code> is <code>true</code>. So calculating
 <code>f(v)</code> is equivalent to checking <code>s.Contains(v)</code>. And checking if <code>s</code> is empty
 is equivalent to checking if <code>f</code> can ever return <code>true</code>.</p>
 <p>We can also go the other way around:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">MakeFunc</span>(<span style="color:#a6e22e">s</span> <span style="color:#a6e22e">Set</span>[<span style="color:#a6e22e">T</span>]) <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">T</span>) <span style="color:#66d9ef">bool</span> {
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">v</span> <span style="color:#a6e22e">T</span>) <span style="color:#66d9ef">bool</span> {
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">s</span>.<span style="color:#a6e22e">Contains</span>(<span style="color:#a6e22e">v</span>)
-</span></span><span style="display:flex;"><span>  }
-</span></span><span style="display:flex;"><span>}
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">MakeFunc</span><span class="p">(</span><span class="nx">s</span> <span class="nx">Set</span><span class="p">[</span><span class="nx">T</span><span class="p">])</span> <span class="kd">func</span><span class="p">(</span><span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="kd">func</span><span class="p">(</span><span class="nx">v</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="nx">s</span><span class="p">.</span><span class="nf">Contains</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><p>So in a sense <code>func(T) bool</code> and <code>Set[T]</code> are “the same thing”. We can
 transform a question about one into a question about the other and back.</p>
 <p>As we observed above it is important <em>how</em> a boolean function is given.
 To take that into account we have to also convert boolean operators into set
 operations:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#75715e">// Union(s, t) contains all elements which are in s *or* in t.
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">Union</span>(<span style="color:#a6e22e">s</span>, <span style="color:#a6e22e">t</span> <span style="color:#a6e22e">Set</span>[<span style="color:#a6e22e">T</span>]) <span style="color:#a6e22e">Set</span>[<span style="color:#a6e22e">T</span>] {
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">MakeSet</span>(<span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">v</span> <span style="color:#a6e22e">T</span>) <span style="color:#66d9ef">bool</span> {
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">s</span>.<span style="color:#a6e22e">Contains</span>(<span style="color:#a6e22e">v</span>) <span style="color:#f92672">||</span> <span style="color:#a6e22e">t</span>.<span style="color:#a6e22e">Contains</span>(<span style="color:#a6e22e">v</span>)
-</span></span><span style="display:flex;"><span>  })
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">// Intersect(s, t) contains all elements which are in s *and* in t.
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">Intersect</span>(<span style="color:#a6e22e">s</span>, <span style="color:#a6e22e">t</span> <span style="color:#a6e22e">Set</span>[<span style="color:#a6e22e">T</span>]) <span style="color:#a6e22e">Set</span>[<span style="color:#a6e22e">T</span>] {
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">MakeSet</span>(<span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">v</span> <span style="color:#a6e22e">T</span>) <span style="color:#66d9ef">bool</span> {
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">s</span>.<span style="color:#a6e22e">Contains</span>(<span style="color:#a6e22e">v</span>) <span style="color:#f92672">&amp;&amp;</span> <span style="color:#a6e22e">t</span>.<span style="color:#a6e22e">Contains</span>(<span style="color:#a6e22e">v</span>)
-</span></span><span style="display:flex;"><span>  })
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">// Complement(s) contains all elements which are *not* in s.
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">Complement</span>(<span style="color:#a6e22e">s</span> <span style="color:#a6e22e">Set</span>[<span style="color:#a6e22e">T</span>]) <span style="color:#a6e22e">Set</span>[<span style="color:#a6e22e">T</span>] {
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">MakeSet</span>(<span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">v</span> <span style="color:#a6e22e">T</span>) <span style="color:#66d9ef">bool</span> {
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> !<span style="color:#a6e22e">s</span>.<span style="color:#a6e22e">Contains</span>(<span style="color:#a6e22e">v</span>)
-</span></span><span style="display:flex;"><span>  })
-</span></span><span style="display:flex;"><span>}
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// Union(s, t) contains all elements which are in s *or* in t.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="nf">Union</span><span class="p">(</span><span class="nx">s</span><span class="p">,</span> <span class="nx">t</span> <span class="nx">Set</span><span class="p">[</span><span class="nx">T</span><span class="p">])</span> <span class="nx">Set</span><span class="p">[</span><span class="nx">T</span><span class="p">]</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="nf">MakeSet</span><span class="p">(</span><span class="kd">func</span><span class="p">(</span><span class="nx">v</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="nx">s</span><span class="p">.</span><span class="nf">Contains</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span> <span class="o">||</span> <span class="nx">t</span><span class="p">.</span><span class="nf">Contains</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="p">})</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// Intersect(s, t) contains all elements which are in s *and* in t.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="nf">Intersect</span><span class="p">(</span><span class="nx">s</span><span class="p">,</span> <span class="nx">t</span> <span class="nx">Set</span><span class="p">[</span><span class="nx">T</span><span class="p">])</span> <span class="nx">Set</span><span class="p">[</span><span class="nx">T</span><span class="p">]</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="nf">MakeSet</span><span class="p">(</span><span class="kd">func</span><span class="p">(</span><span class="nx">v</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="nx">s</span><span class="p">.</span><span class="nf">Contains</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="nx">t</span><span class="p">.</span><span class="nf">Contains</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="p">})</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// Complement(s) contains all elements which are *not* in s.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="nf">Complement</span><span class="p">(</span><span class="nx">s</span> <span class="nx">Set</span><span class="p">[</span><span class="nx">T</span><span class="p">])</span> <span class="nx">Set</span><span class="p">[</span><span class="nx">T</span><span class="p">]</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="nf">MakeSet</span><span class="p">(</span><span class="kd">func</span><span class="p">(</span><span class="nx">v</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="p">!</span><span class="nx">s</span><span class="p">.</span><span class="nf">Contains</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="p">})</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><p>And back:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#75715e">// Or creates a function which returns if f or g is true.
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">Or</span>(<span style="color:#a6e22e">f</span>, <span style="color:#a6e22e">g</span> <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">T</span>) <span style="color:#66d9ef">bool</span>) <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">T</span>) <span style="color:#66d9ef">bool</span> {
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">MakeFunc</span>(<span style="color:#a6e22e">Union</span>(<span style="color:#a6e22e">MakeSet</span>(<span style="color:#a6e22e">f</span>), <span style="color:#a6e22e">MakeSet</span>(<span style="color:#a6e22e">g</span>)))
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">// And creates a function which returns if f and g are true.
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">And</span>(<span style="color:#a6e22e">f</span>, <span style="color:#a6e22e">g</span> <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">T</span>) <span style="color:#66d9ef">bool</span>) <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">T</span>) <span style="color:#66d9ef">bool</span> {
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">MakeFunc</span>(<span style="color:#a6e22e">Intersect</span>(<span style="color:#a6e22e">MakeSet</span>(<span style="color:#a6e22e">f</span>), <span style="color:#a6e22e">MakeSet</span>(<span style="color:#a6e22e">g</span>)))
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">// Not creates a function which returns if f is false
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">Not</span>(<span style="color:#a6e22e">f</span> <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">T</span>) <span style="color:#66d9ef">bool</span>) <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">T</span>) <span style="color:#66d9ef">bool</span> {
-</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">MakeFunc</span>(<span style="color:#a6e22e">Complement</span>(<span style="color:#a6e22e">MakeSet</span>(<span style="color:#a6e22e">f</span>)))
-</span></span><span style="display:flex;"><span>}
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// Or creates a function which returns if f or g is true.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="nf">Or</span><span class="p">(</span><span class="nx">f</span><span class="p">,</span> <span class="nx">g</span> <span class="kd">func</span><span class="p">(</span><span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span><span class="p">)</span> <span class="kd">func</span><span class="p">(</span><span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="nf">MakeFunc</span><span class="p">(</span><span class="nf">Union</span><span class="p">(</span><span class="nf">MakeSet</span><span class="p">(</span><span class="nx">f</span><span class="p">),</span> <span class="nf">MakeSet</span><span class="p">(</span><span class="nx">g</span><span class="p">)))</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// And creates a function which returns if f and g are true.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="nf">And</span><span class="p">(</span><span class="nx">f</span><span class="p">,</span> <span class="nx">g</span> <span class="kd">func</span><span class="p">(</span><span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span><span class="p">)</span> <span class="kd">func</span><span class="p">(</span><span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="nf">MakeFunc</span><span class="p">(</span><span class="nf">Intersect</span><span class="p">(</span><span class="nf">MakeSet</span><span class="p">(</span><span class="nx">f</span><span class="p">),</span> <span class="nf">MakeSet</span><span class="p">(</span><span class="nx">g</span><span class="p">)))</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// Not creates a function which returns if f is false
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="nf">Not</span><span class="p">(</span><span class="nx">f</span> <span class="kd">func</span><span class="p">(</span><span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span><span class="p">)</span> <span class="kd">func</span><span class="p">(</span><span class="nx">T</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">return</span> <span class="nf">MakeFunc</span><span class="p">(</span><span class="nf">Complement</span><span class="p">(</span><span class="nf">MakeSet</span><span class="p">(</span><span class="nx">f</span><span class="p">)))</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><p>The takeaway from all of this is that constructing a set using <code>Union</code>,
 <code>Intersect</code> and <code>Complement</code> is really the same as writing a boolean function
 using <code>||</code>, <code>&amp;&amp;</code> and <code>!</code>.</p>
@@ -235,28 +235,28 @@ is checking if one of the sets constructed like this.</p>
 <p>With this, let us look at the specific sets we are interested in.</p>
 <h2 id="basic-interfaces-as-type-sets">Basic interfaces as type sets</h2>
 <p>Interfaces in Go are used to describe sets of types. For example, the interface</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">S</span> <span style="color:#66d9ef">interface</span> {
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">X</span>()
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">Y</span>()
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">Z</span>()
-</span></span><span style="display:flex;"><span>}
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">S</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nf">X</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">    <span class="nf">Y</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">    <span class="nf">Z</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><p>is “the set of all types which have a method <code>X()</code> and a method <code>Y()</code> and a
 method <code>Z()</code>”.</p>
 <p>We can also express set intersection, using <a href="https://go.dev/ref/spec#Embedded_interfaces">interface embedding</a>:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">S</span> <span style="color:#66d9ef">interface</span> { <span style="color:#a6e22e">X</span>() }
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">T</span> <span style="color:#66d9ef">interface</span> { <span style="color:#a6e22e">Y</span>() }
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">U</span> <span style="color:#66d9ef">interface</span> {
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">S</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">T</span>
-</span></span><span style="display:flex;"><span>}
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">S</span> <span class="kd">interface</span> <span class="p">{</span> <span class="nf">X</span><span class="p">()</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">T</span> <span class="kd">interface</span> <span class="p">{</span> <span class="nf">Y</span><span class="p">()</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">U</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">S</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">T</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><p>This expresses the intersection of <code>S</code> and <code>T</code> as an interface. Or we can view
 the property “has a method <code>X()</code>” as a boolean variable and think of this as
 the formula <code>x &amp;&amp; y</code>.</p>
 <p>Surprisingly, there is also a limited form of negation. It happens implicitly,
 because a type can not have two different methods with the same name.
 Implicitly, if a type has a method <code>X()</code> it does <em>not</em> have a method <code>X() int</code> for example:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">X</span> <span style="color:#66d9ef">interface</span> { <span style="color:#a6e22e">X</span>() }
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">NotX</span> <span style="color:#66d9ef">interface</span>{ <span style="color:#a6e22e">X</span>() <span style="color:#66d9ef">int</span> }
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">X</span> <span class="kd">interface</span> <span class="p">{</span> <span class="nf">X</span><span class="p">()</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">NotX</span> <span class="kd">interface</span><span class="p">{</span> <span class="nf">X</span><span class="p">()</span> <span class="kt">int</span> <span class="p">}</span>
 </span></span></code></pre></div><p>There is a small snag: A type can have <em>neither</em> a method <code>X()</code> <em>nor</em> have a
 method <code>X() int</code>. That&rsquo;s why our negation operator is limited. Real boolean
 variables are always <em>either</em> <code>true</code> <em>or</em> <code>false</code>, whereas our negation also
@@ -265,13 +265,13 @@ allows them to be neither. In mathematics we say that this logic language lacks
 (also called “Tertium Non Datur” - “there is no third”). For this section, that does not matter. But we have to worry about it later.</p>
 <p>Because we have intersection and negation, we can express interfaces which
 could never be satisfied by any type (i.e. which describe an empty type set):</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">interface</span>{ <span style="color:#a6e22e">X</span>; <span style="color:#a6e22e">NotX</span> }
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">interface</span><span class="p">{</span> <span class="nx">X</span><span class="p">;</span> <span class="nx">NotX</span> <span class="p">}</span>
 </span></span></code></pre></div><p><a href="https://go.dev/play/p/r4kpXNynscX">The compiler rejects such interfaces</a>. But
 how can it do that? Did we not say above that checking if a set is empty is
 NP-complete?</p>
 <p>The reason this works is that we only have negation and conjunction (<code>&amp;&amp;</code>). So
 all the boolean expressions we can build with this language have the form</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#a6e22e">x</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#a6e22e">y</span> <span style="color:#f92672">&amp;&amp;</span> !<span style="color:#a6e22e">z</span>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="nx">x</span> <span class="o">&amp;&amp;</span> <span class="nx">y</span> <span class="o">&amp;&amp;</span> <span class="p">!</span><span class="nx">z</span>
 </span></span></code></pre></div><p>These expressions are in DNF! We have a term, which contains a couple of
 variables - possibly negated - and joins them together using <code>&amp;&amp;</code>. We don&rsquo;t
 have <code>||</code>, so there is only a single term.</p>
@@ -281,9 +281,9 @@ for emptiness.</p>
 <h2 id="adding-unions">Adding unions</h2>
 <p>Go 1.18 extends the interface syntax. For our purposes, the important addition
 is the <code>|</code> operator:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">S</span> <span style="color:#66d9ef">interface</span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">A</span> | <span style="color:#a6e22e">B</span>
-</span></span><span style="display:flex;"><span>}
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">S</span> <span class="kd">interface</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">A</span> <span class="p">|</span> <span class="nx">B</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><p>This represents the set of all types which are in the <em>union</em> of the type sets
 <code>A</code> and <code>B</code> - that is, it is the set of all types which are in <code>A</code> <em>or</em> in <code>B</code>
 (or both).</p>
@@ -292,39 +292,39 @@ is the <code>|</code> operator:</p>
 <code>||</code> in the language of formulas. What&rsquo;s more, the form of our formula is now a
 <em>conjunctive</em> normal form - every line is a term of <code>||</code> and the lines are
 connected by <code>&amp;&amp;</code>:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">X</span> <span style="color:#66d9ef">interface</span> { <span style="color:#a6e22e">X</span>() }
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">NotX</span> <span style="color:#66d9ef">interface</span>{ <span style="color:#a6e22e">X</span>() <span style="color:#66d9ef">int</span> }
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">Y</span> <span style="color:#66d9ef">interface</span> { <span style="color:#a6e22e">Y</span>() }
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">NotY</span> <span style="color:#66d9ef">interface</span>{ <span style="color:#a6e22e">Y</span>() <span style="color:#66d9ef">int</span> }
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">Z</span> <span style="color:#66d9ef">interface</span> { <span style="color:#a6e22e">Z</span>() }
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">NotZ</span> <span style="color:#66d9ef">interface</span>{ <span style="color:#a6e22e">Z</span>() <span style="color:#66d9ef">int</span> }
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">// (!x || z) &amp;&amp; (y || z) &amp;&amp; (x || !y)
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">S</span> <span style="color:#66d9ef">interface</span> {
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">NotX</span> | <span style="color:#a6e22e">Z</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">Y</span> | <span style="color:#a6e22e">Z</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">X</span> | <span style="color:#a6e22e">NotY</span>
-</span></span><span style="display:flex;"><span>}
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">X</span> <span class="kd">interface</span> <span class="p">{</span> <span class="nf">X</span><span class="p">()</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">NotX</span> <span class="kd">interface</span><span class="p">{</span> <span class="nf">X</span><span class="p">()</span> <span class="kt">int</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Y</span> <span class="kd">interface</span> <span class="p">{</span> <span class="nf">Y</span><span class="p">()</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">NotY</span> <span class="kd">interface</span><span class="p">{</span> <span class="nf">Y</span><span class="p">()</span> <span class="kt">int</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Z</span> <span class="kd">interface</span> <span class="p">{</span> <span class="nf">Z</span><span class="p">()</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">NotZ</span> <span class="kd">interface</span><span class="p">{</span> <span class="nf">Z</span><span class="p">()</span> <span class="kt">int</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// (!x || z) &amp;&amp; (y || z) &amp;&amp; (x || !y)
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">type</span> <span class="nx">S</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">NotX</span> <span class="p">|</span> <span class="nx">Z</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">Y</span> <span class="p">|</span> <span class="nx">Z</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">X</span> <span class="p">|</span> <span class="nx">NotY</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><p>This is not <em>quite</em> enough to prove NP-completeness though, because of the snag
 above. If we want to prove that it is easy, it does not matter that a type can
 have neither method. But if we want to prove that it is hard, we really need an
 <em>exact</em> equivalence between boolean functions and type sets. So we need to
 guarantee that a type has one of our two contradictory methods.</p>
 <p>“Luckily”, the <code>|</code> operator gives us a way to fix that:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">TertiumNonDatur</span> <span style="color:#66d9ef">interface</span> {
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">X</span> | <span style="color:#a6e22e">NotX</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">Y</span> | <span style="color:#a6e22e">NotY</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">Z</span> | <span style="color:#a6e22e">NotZ</span>
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">// (!x || z) &amp;&amp; (y || z) &amp;&amp; (x || !y)
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">S</span> <span style="color:#66d9ef">interface</span> {
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">TertiumNonDatur</span>
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">NotX</span> | <span style="color:#a6e22e">Z</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">Y</span> | <span style="color:#a6e22e">Z</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">X</span> | <span style="color:#a6e22e">NotY</span>
-</span></span><span style="display:flex;"><span>}
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">TertiumNonDatur</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">X</span> <span class="p">|</span> <span class="nx">NotX</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">Y</span> <span class="p">|</span> <span class="nx">NotY</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">Z</span> <span class="p">|</span> <span class="nx">NotZ</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// (!x || z) &amp;&amp; (y || z) &amp;&amp; (x || !y)
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">type</span> <span class="nx">S</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">TertiumNonDatur</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="nx">NotX</span> <span class="p">|</span> <span class="nx">Z</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">Y</span> <span class="p">|</span> <span class="nx">Z</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">X</span> <span class="p">|</span> <span class="nx">NotY</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><p>Now any type which could possibly implement <code>S</code> <em>must</em> have either an <code>X()</code> or
 an <code>X() int</code> method, because it must implement <code>TertiumNonDatur</code> as well. So
 this extra interface helps us to get the law of the excluded middle into our
