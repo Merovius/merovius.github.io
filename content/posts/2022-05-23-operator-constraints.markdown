@@ -64,7 +64,7 @@ The main advantage of this is that it works directly with predeclared types and
 simple types like `time.Duration`. It also is very clear.
 
 The main disadvantage is that it does not allow composite types like `struct`s.
-And what if a user want a different sorting order than the one implied by `<`?
+And what if a user wants a different sorting order than the one implied by `<`?
 For example if they want to reverse the order or want specialized string
 collation. A multimedia library might want to sort “The Expanse” under E. And
 some letters sort differently depending on the language setting.
@@ -80,7 +80,7 @@ We can write that constraint like this:
 
 ```go
 type Lesser[T any] interface {
-  // Less returns if the receiver is less than v.
+  // Less returns true if the receiver is less than v.
   Less(v T) bool
 }
 ```
@@ -314,15 +314,15 @@ We are left with these trade-offs:
 
 || `constraints.Ordered` | `Lesser[T]` | `func(T,T) bool` | `Comparator[T]` |
 |--------------------------|----|--------|----|----|
-| Predeclared types        | 👍 | 👎     | 👎 | 👎 |
-| Composite types          | 👎 | 👍     | 👍 | 👍 |
-| Custom order             | 👎 | 👍     | 👍 | 👍 |
-| Reversal helpers         | 👍 | 👎     | 👍 | 👍 |
-| Type boilerplate         | 👍 | 👎     | 👍 | 👎 |
-| Useful zero value        | 👍 | 👍     | 👎 | 👍 |
-| Type inference           | 👍 | 👍     | 👍 | 👎 |
-| Coupled Type/Order       | 👎 | 👎     | 👍 | 👍 |
-| Clarity                  | 👍 | 🤷[^2] | 👍 | 👎 |
+| Predeclared types        | ✅ | ❌     | ❌ | ❌ |
+| Composite types          | ❌ | ✅     | ✅ | ✅ |
+| Custom order             | ❌ | ✅     | ✅ | ✅ |
+| Reversal helpers         | ✅ | ❌     | ✅ | ✅ |
+| Type boilerplate         | ✅ | ❌     | ✅ | ❌ |
+| Useful zero value        | ✅ | ✅     | ❌ | ✅ |
+| Type inference           | ✅ | ✅     | ✅ | ❌ |
+| Coupled Type/Order       | ❌ | ❌     | ✅ | ✅ |
+| Clarity                  | ✅ | 🤷[^2] | ✅ | ❌ |
 
 [^2]: It's a *little* bit worse, but probably fine.
 
@@ -350,5 +350,3 @@ a `constraints.Ordered` version and a comparison function version.  The latter
 gets a `Func` suffix to the name. See
 [the experimental `slices` package](https://pkg.go.dev/golang.org/x/exp/slices)
 for an example.
-
-
