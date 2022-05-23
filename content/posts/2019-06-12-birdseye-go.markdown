@@ -33,7 +33,7 @@ is maintained by the Go team and versioned, with a new release roughly every
 six months. At the time I wrote this post, the newest release was version
 `1.12`.
 
-The domain of the spec are
+The domain of the spec are:
 
 * The grammar of the language
 * Types, values and their semantics
@@ -52,7 +52,7 @@ For that you need software that actually implements these semantics. This is
 done by a compiler (which analyzes and checks the source code and
 transforms it into an executable format) and a runtime (which provides the
 necessary environment to actually run the code). There are many such
-combinations and they all differ a bit more or a bit less. Examples are
+combinations and they all differ a bit more or a bit less. Examples are:
 
 * `gc`, a compiler and runtime written in pure Go (with some assembly) by the
   Go team themselves and versioned and released together with the language.
@@ -269,8 +269,6 @@ reference you found helpful. You can also drop me a note if you're a more
 experienced Gopher and think I missed something important (but keep in mind
 that I intentionally left out most references, so as to keep the ways
 forward crisp and clear :) ).
-
----
 
 [^1]: The Go team is currently rolling out support for *modules*, which is
 	a unit of code distribution above packages, including support for versioning
