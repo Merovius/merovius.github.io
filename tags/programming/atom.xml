@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">programming on Mero's Blog</title><link href="https://blog.merovius.de/tags/programming/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/programming/atom.xml"/><updated>2022-05-23T17:37:54+00:00</updated><id>https://blog.merovius.de/tags/programming/</id><author><name>Axel Wagner</name></author><entry><title type="html">Operator constraints in Go</title><link href="https://blog.merovius.de/posts/2022-05-23-operator-constraints/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-05-23-operator-constraints/</id><published>2022-05-23T17:34:00+00:00</published><updated>2022-05-23T17:34:00+00:00</updated><content type="html"><![CDATA[<p>Let&rsquo;s say you want to implement a sorting function in Go. Or perhaps a data
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">programming on Mero's Blog</title><link href="https://blog.merovius.de/tags/programming/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/programming/atom.xml"/><updated>2022-05-23T21:23:25+00:00</updated><id>https://blog.merovius.de/tags/programming/</id><author><name>Axel Wagner</name></author><entry><title type="html">Operator constraints in Go</title><link href="https://blog.merovius.de/posts/2022-05-23-operator-constraints/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-05-23-operator-constraints/</id><published>2022-05-23T17:34:00+00:00</published><updated>2022-05-23T17:34:00+00:00</updated><content type="html"><![CDATA[<p>Let&rsquo;s say you want to implement a sorting function in Go. Or perhaps a data
 structure like a
 <a href="https://en.wikipedia.org/wiki/Binary_search_tree">binary search tree</a>,
 providing ordered access to its elements. Because you want your code to be
@@ -42,7 +42,7 @@ definition of your search tree as:</p>
 </span></span></code></pre></div><p>The main advantage of this is that it works directly with predeclared types and
 simple types like <code>time.Duration</code>. It also is very clear.</p>
 <p>The main disadvantage is that it does not allow composite types like <code>struct</code>s.
-And what if a user want a different sorting order than the one implied by <code>&lt;</code>?
+And what if a user wants a different sorting order than the one implied by <code>&lt;</code>?
 For example if they want to reverse the order or want specialized string
 collation. A multimedia library might want to sort “The Expanse” under E. And
 some letters sort differently depending on the language setting.</p>
