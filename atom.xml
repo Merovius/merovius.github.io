@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">Mero's Blog</title><link href="https://blog.merovius.de/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/atom.xml"/><updated>2022-12-08T12:32:55+00:00</updated><id>https://blog.merovius.de/</id><author><name>Axel Wagner</name></author><entry><title type="html">Cleanly merge git repositories</title><link href="https://blog.merovius.de/posts/2022-12-08-cleanly-merge-git-repositories/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-12-08-cleanly-merge-git-repositories/</id><published>2022-12-08T12:05:00+00:00</published><updated>2022-12-08T12:05:00+00:00</updated><content type="html"><![CDATA[<p><em>Note: If you don&rsquo;t want to read the exposition and explanations and just want
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">Mero's Blog</title><link href="https://blog.merovius.de/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/atom.xml"/><updated>2022-12-08T12:37:16+00:00</updated><id>https://blog.merovius.de/</id><author><name>Axel Wagner</name></author><entry><title type="html">Cleanly merge git repositories</title><link href="https://blog.merovius.de/posts/2022-12-08-cleanly-merge-git-repositories/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-12-08-cleanly-merge-git-repositories/</id><published>2022-12-08T12:05:00+00:00</published><updated>2022-12-08T12:05:00+00:00</updated><content type="html"><![CDATA[<p><em>Note: If you don&rsquo;t want to read the exposition and explanations and just want
 to know the steps I did, scroll to the summary at the bottom.</em></p>
 <p>For a couple of years I have (with varying degrees of commitment) participated
 in <a href="https://adventofcode.com/">Advent of Code</a>, a yearly programming
@@ -137,7 +137,7 @@ creates a new branch <code>main</code> (remember: So far our repository had no b
 pointing at the Commit we created.</p>
 <p>And that&rsquo;s it. We can now treat the repository as a normal git repo. All that
 is left is to publish it:</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-sh" data-lang="sh"><span class="line"><span class="cl">$ git remote add origin git@github.com:Merovius/AdventOfCode
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">$ git remote add origin git@github.com:Merovius/AdventOfCode
 </span></span><span class="line"><span class="cl">$ git push --set-upstream origin main
 </span></span></code></pre></div><h1 id="executive-summary">Executive Summary</h1>
 <p>To summarize the steps I did:</p>
@@ -149,26 +149,26 @@ fixing anticipated merge conflicts as needed.</li>
 </span></span><span class="line"><span class="cl">$ <span class="nb">cd</span> merged
 </span></span></code></pre></div></li>
 <li>Add the old repositories as remotes for the merged repo:
-<pre tabindex="0"><code>$ git remote add &lt;repo1&gt; /path/to/repo1
-$ git fetch repo1
-$ git remote add &lt;repo2&gt; /path/to/repo2
-$ git fetch repo2
-$ # …
-</code></pre></li>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">$ git remote add &lt;repo1&gt; /path/to/repo1
+</span></span><span class="line"><span class="cl">$ git fetch repo1
+</span></span><span class="line"><span class="cl">$ git remote add &lt;repo2&gt; /path/to/repo2
+</span></span><span class="line"><span class="cl">$ git fetch repo2
+</span></span><span class="line"><span class="cl">$ <span class="c1"># …</span>
+</span></span></code></pre></div></li>
 <li>Copy files from old repositories into merged repo:
-<pre tabindex="0"><code>$ cp -r /path/to/repo1/* .
-$ cp -r /path/to/repo2/* .
-$ # …
-</code></pre></li>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">$ cp -r /path/to/repo1/* .
+</span></span><span class="line"><span class="cl">$ cp -r /path/to/repo2/* .
+</span></span><span class="line"><span class="cl">$ <span class="c1"># …</span>
+</span></span></code></pre></div></li>
 <li>Create commit using plumbing commands:
-<pre tabindex="0"><code>$ git add .
-$ TREE=$(git write-tree)
-$ COMMIT=$(git commit-tree $TREE \
-    -m &#34;merge repositories&#34; \
-    -p remotes/repo1/main \
-    -p remotes/repo2/main)
-$ git branch main $COMMIT
-</code></pre></li>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">$ git add .
+</span></span><span class="line"><span class="cl">$ <span class="nv">TREE</span><span class="o">=</span><span class="k">$(</span>git write-tree<span class="k">)</span>
+</span></span><span class="line"><span class="cl">$ <span class="nv">COMMIT</span><span class="o">=</span><span class="k">$(</span>git commit-tree <span class="nv">$TREE</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    -m <span class="s2">&#34;merge repositories&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    -p remotes/repo1/main <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    -p remotes/repo2/main<span class="k">)</span>
+</span></span><span class="line"><span class="cl">$ git branch main <span class="nv">$COMMIT</span>
+</span></span></code></pre></div></li>
 </ol>
 ]]></content></entry><entry><title type="html">Operator constraints in Go</title><link href="https://blog.merovius.de/posts/2022-05-23-operator-constraints/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-05-23-operator-constraints/</id><published>2022-05-23T17:34:00+00:00</published><updated>2022-05-23T17:34:00+00:00</updated><content type="html"><![CDATA[<p>Let&rsquo;s say you want to implement a sorting function in Go. Or perhaps a data
 structure like a
