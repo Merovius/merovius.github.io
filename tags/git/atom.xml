@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">git on Mero's Blog</title><link href="https://blog.merovius.de/tags/git/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/git/atom.xml"/><updated>2022-12-08T12:32:55+00:00</updated><id>https://blog.merovius.de/tags/git/</id><author><name>Axel Wagner</name></author><entry><title type="html">Cleanly merge git repositories</title><link href="https://blog.merovius.de/posts/2022-12-08-cleanly-merge-git-repositories/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-12-08-cleanly-merge-git-repositories/</id><published>2022-12-08T12:05:00+00:00</published><updated>2022-12-08T12:05:00+00:00</updated><content type="html"><![CDATA[<p><em>Note: If you don&rsquo;t want to read the exposition and explanations and just want
+to know the steps I did, scroll to the summary at the bottom.</em></p>
+<p>For a couple of years I have (with varying degrees of commitment) participated
+in <a href="https://adventofcode.com/">Advent of Code</a>, a yearly programming
+competition. It consists of fun little daily challenges. It is great to
+exercise your coding muscles and can provide opportunity to learn new languages
+and technologies.</p>
+<p>So far I have created a separate repository for each year, with a directory
+per day. But I decided that I&rsquo;d prefer to have a single repository, containing
+my solutions for <em>all</em> years. The main reason is that I tend to write little
+helpers that I would like to re-use between years.</p>
+<p>When merging the repositories it was important to me to preserve the history
+of the individual years as well, though. I googled around for how to do this
+and the solutions I found didn&rsquo;t <em>quite</em> work for me. So I thought I should
+document my own solution, in case anyone finds it useful.</p>
+<p>You can <a href="https://github.com/Merovius/AdventOfCode/network">see the result here</a>.
+As you can see, there are four cleanly disjoint branches with separate
+histories. They then merge into one single commit.</p>
+<p>One neat effect of this is that the merged repository functions as a normal
+remote for all the four old repositories. It involves no rewrites of history
+and all the previous commits are preserved exactly as-is.  So you can just <code>git pull</code> from this new repository and git will fast-forward the branch.</p>
+<h1 id="step-1-prepare-individual-repositories">Step 1: Prepare individual repositories</h1>
+<p>First I went through all repositories and prepared them. I wanted to have the
+years in individual directories. In theory, it is possible to use
+<a href="https://git-scm.com/docs/git-filter-branch">git-filter-repo</a> and similar
+tooling to automate this step. For larger projects this might be worth it.</p>
+<p>I found it simpler to manually make the changes in the individual repositories
+and commit them. In particular, I did not only need to move the files to the
+sub directory, I also had to fix up Go module and import paths. Figuring out
+how to automate that seemed like a chore. But doing it manually is a quick and
+easy <code>sed</code> command.</p>
+<p>You can see an example of that
+<a href="https://github.com/Merovius/AdventOfCode/commit/8acd4ccd75c3e77cebacad98561bcf23a00e986e">in this commit</a>.
+While that link points at the final, merged repository, I created the commit in
+the old repository. You can see that a lot of files simply moved. But some also
+had additional changes.</p>
+<p>You can also see that I left the <code>go.mod</code> in the top-level directory. That was
+intentional - I want the final repository to share a single module, so that&rsquo;s
+where the <code>go.mod</code> belongs.</p>
+<p>After this I was left with four repositories, each of which had all the
+solutions in their own subdirectory, with a <code>go.mod</code>/<code>go.sum</code> file with the
+shared module path. I tested that all solutions still compile and appeared to
+work and moved on.</p>
+<h1 id="step-2-prepare-merged-repository">Step 2: Prepare merged repository</h1>
+<p>The next step is to create a new repository which can reference commits and
+objects in all the other repos. After all, it needs to contain the individual
+histories. This is simple by setting the individual repositories as remotes:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">$ mkdir ~/src/github.com/Merovius/AdventOfCode
+</span></span><span class="line"><span class="cl">$ <span class="nb">cd</span> ~/src/github.com/Merovius/AdventOfCode
+</span></span><span class="line"><span class="cl">$ git init
+</span></span><span class="line"><span class="cl">$ git remote add <span class="m">2018</span> ~/src/github.com/Merovius/aoc18
+</span></span><span class="line"><span class="cl">$ git remote add <span class="m">2020</span> ~/src/github.com/Merovius/aoc_2020
+</span></span><span class="line"><span class="cl">$ git remote add <span class="m">2021</span> ~/src/github.com/Merovius/aoc_2021
+</span></span><span class="line"><span class="cl">$ git remote add <span class="m">2022</span> ~/src/github.com/Merovius/aoc_2022
+</span></span><span class="line"><span class="cl">$ git fetch --multiple <span class="m">2018</span> <span class="m">2020</span> <span class="m">2021</span> <span class="m">2022</span>
+</span></span><span class="line"><span class="cl">$ git branch -a
+</span></span><span class="line"><span class="cl">remotes/2018/master
+</span></span><span class="line"><span class="cl">remotes/2020/main
+</span></span><span class="line"><span class="cl">remotes/2021/main
+</span></span><span class="line"><span class="cl">remotes/2022/main
+</span></span></code></pre></div><p>One thing worth pointing out is that at this point, the merged <code>AdventOfCode</code>
+repository <em>does not have any branches itself</em>. The only existing branches are
+<code>remotes/</code> references. This is relevant because we don&rsquo;t want our resulting
+histories to share any common ancestor. And because git behaves slightly
+differently in an empty repository. A lot of commands operate on <code>HEAD</code> (the
+“current branch”), so they have special handling if there is no <code>HEAD</code>.</p>
+<h1 id="step-3-create-merge-commit">Step 3: Create merge commit</h1>
+<p>A git commit can have an arbitrary number of “parents”:</p>
+<ul>
+<li>If a commit has zero parents, it is the start of the history. This is what
+happens if you run <code>git commit</code> in a fresh repository.</li>
+<li>If a commit has exactly one parent, it is a regular commit. This is what
+happens when you run <code>git commit</code> normally.</li>
+<li>If a parent has more than one parent, it is a merge commit. This is what
+happens when you use <code>git merge</code> or merge a pull request in the web UI of a
+git hoster (like GitHub or Gitlab).</li>
+</ul>
+<p>Normally merge commits have two parents - one that is the “main” branch and
+one that is being “merged into”. However, git does not really distinguish
+between “main” and “merged” branch. And it also allows a branch to have <em>more</em>
+than two parents.</p>
+<p>We want to create a new commit with four parents: The <code>HEAD</code>s of our four
+individual repositories. I expected this to be simple, but:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">$ git merge --allow-unrelated-histories remotes/2018/master remotes/2020/main remotes/2021/main remotes/2022/main
+</span></span><span class="line"><span class="cl">fatal: Can merge only exactly one commit into empty head
+</span></span></code></pre></div><p>This command was supposed to create a merge commit with four parents. We have
+to pass <code>--allow-unrelated-histories</code>, as git otherwise tries to find a common
+ancestor between the parents and complains if it can&rsquo;t find any.</p>
+<p>But the command is failing. It seems git is unhappy using <code>git merge</code> with
+multiple parents if we do not have any branch yet.</p>
+<p>I suspect the intended path at this point would be to check out one of the
+branches and then merge the others into that. But that creates merge conflicts
+and it also felt… asymmetric to me. I did not want to give any of the base
+repositories preference. So instead I opted for a more brute-force approach:
+Dropping down to the
+<a href="https://git-scm.com/book/en/v2/Git-Internals-Plumbing-and-Porcelain">plumbing layer</a>.</p>
+<p>First, I created the merged directory structure:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">$ cp -r ~/src/github.com/Merovius/aoc18/* .
+</span></span><span class="line"><span class="cl">$ cp -r ~/src/github.com/Merovius/aoc_2020/* .
+</span></span><span class="line"><span class="cl">$ cp -r ~/src/github.com/Merovius/aoc_2021/* .
+</span></span><span class="line"><span class="cl">$ cp -r ~/src/github.com/Merovius/aoc_2022/* .
+</span></span><span class="line"><span class="cl">$ vim go.mod <span class="c1"># fix up the merged list of dependencies</span>
+</span></span><span class="line"><span class="cl">$ go mod tidy
+</span></span><span class="line"><span class="cl">$ git add .
+</span></span></code></pre></div><p><em>Note: The above does not copy hidden files (like <code>.gitignore</code>). If you do
+copy hidden files, take care not to copy any <code>.git</code> directories.</em></p>
+<p>At this point the working directory contains the complete directory layout for
+the merged commit and it is all in the staging area (or “index”). This is where
+we normally run <code>git commit</code>. Instead we do the equivalent steps manually,
+allowing us to override the exact contents:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">$ <span class="nv">TREE</span><span class="o">=</span><span class="k">$(</span>git write-tree<span class="k">)</span>
+</span></span><span class="line"><span class="cl">$ <span class="nv">COMMIT</span><span class="o">=</span><span class="k">$(</span>git commit-tree <span class="nv">$TREE</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    -p remotes/2018/master <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    -p remotes/2020/main <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    -p remotes/2021/main <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    -p remotes/2022/main <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    -m <span class="s2">&#34;merge history of all years&#34;</span><span class="k">)</span>
+</span></span><span class="line"><span class="cl">$ git branch main <span class="nv">$COMMIT</span>
+</span></span></code></pre></div><p>The <code>write-tree</code> command takes the content of the index and writes it to a
+<a href="https://git-scm.com/book/en/v2/Git-Internals-Git-Objects#_tree_objects">“Tree Object”</a>
+and then returns a reference to the Tree it has written.</p>
+<p>A Tree is an immutable representation of a directory in git. It (essentially)
+contains a list of file name and ID pairs, where each ID points either to a
+“Blob” (an immutable file) or another Tree.</p>
+<p>A Commit in git is just a Tree (describing the state of the files in the
+repository at that commit), a list of parents, a commit message and some meta
+data (like who created the commit and when).</p>
+<p>The <code>commit-tree</code> command is a low-level command to create such a Commit
+object. We give it the ID of the Tree the Commit should contain and a list of
+parents (using <code>-p</code>) as well as a message (using <code>-m</code>). It then writes out that
+Commit to storage and returns its ID.</p>
+<p>At this point we have a well-formed Commit, but it is just loosely stored in
+the repository. We still need a Branch to point at it, so it doesn&rsquo;t get lost
+and we have a memorable handle.</p>
+<p>You probably used the <code>git branch</code> command before. In the form above, it
+creates a new branch <code>main</code> (remember: So far our repository had no branches)
+pointing at the Commit we created.</p>
+<p>And that&rsquo;s it. We can now treat the repository as a normal git repo. All that
+is left is to publish it:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-sh" data-lang="sh"><span class="line"><span class="cl">$ git remote add origin git@github.com:Merovius/AdventOfCode
+</span></span><span class="line"><span class="cl">$ git push --set-upstream origin main
+</span></span></code></pre></div><h1 id="executive-summary">Executive Summary</h1>
+<p>To summarize the steps I did:</p>
+<ol>
+<li>Create commits in each of the old repositories to move files around and
+fixing anticipated merge conflicts as needed.</li>
+<li>Create a pristine new repository without any branches:
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">$ git init merged
+</span></span><span class="line"><span class="cl">$ <span class="nb">cd</span> merged
+</span></span></code></pre></div></li>
+<li>Add the old repositories as remotes for the merged repo:
+<pre tabindex="0"><code>$ git remote add &lt;repo1&gt; /path/to/repo1
+$ git fetch repo1
+$ git remote add &lt;repo2&gt; /path/to/repo2
+$ git fetch repo2
+$ # …
+</code></pre></li>
+<li>Copy files from old repositories into merged repo:
+<pre tabindex="0"><code>$ cp -r /path/to/repo1/* .
+$ cp -r /path/to/repo2/* .
+$ # …
+</code></pre></li>
+<li>Create commit using plumbing commands:
+<pre tabindex="0"><code>$ git add .
+$ TREE=$(git write-tree)
+$ COMMIT=$(git commit-tree $TREE \
+    -m &#34;merge repositories&#34; \
+    -p remotes/repo1/main \
+    -p remotes/repo2/main)
+$ git branch main $COMMIT
+</code></pre></li>
+</ol>
+]]></content></entry></feed>
