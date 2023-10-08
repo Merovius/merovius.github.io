@@ -27,7 +27,7 @@ that a value of type A can always be used, where a value of type B is required.
 Go doesn't have explicit subtype relationships - the closest it has is
 [assignability](https://golang.org/ref/spec#Assignability) which mostly
 determines whether types can be used interchangeably. Probably the most
-important case of this is given by interfaces: If a type T (whether its a
+important case of this is given by interfaces: If a type T (whether it's a
 concrete type, or itself an interface) implements an interface I, then T can be
 viewed as a subtype of I. In that sense,
 [`*bytes.Buffer`](https://godoc.org/bytes#Buffer) is a subtype of
@@ -156,7 +156,7 @@ func main() {
 }
 ```
 
-So in this case, there just *is* not relationship between the composite types.
+So in this case, there just *is* not a relationship between the composite types.
 This is called *invariance*.
 
 ---
@@ -206,7 +206,7 @@ In that sense, [read-only types](https://github.com/golang/go/issues/22876)
 have the potential to at least theoretically allow variance for slices. While
 `[]int` still wouldn't be a subtype of `[]interface{}`, we could make `ro
 []int` a subtype of `ro []interface{}` (borrowing the syntax from the
-proposal).
+[proposal](https://github.com/golang/go/issues/22876)).
 
 ---
 
