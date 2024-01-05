@@ -8,6 +8,8 @@ theme: "PaperMod"
 params:
   hideFooter: true
   socialIcons:
+    - name: "RSS"
+      url: "/atom.xml"
     - name: "Mastodon"
       url: "https://chaos.social/@Merovius"
     - name: "Tumblr"
