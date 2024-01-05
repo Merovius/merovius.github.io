@@ -1,4 +1,350 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">programming on Mero's Blog</title><link href="https://blog.merovius.de/tags/programming/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/programming/atom.xml"/><updated>2023-10-09T04:19:38+00:00</updated><id>https://blog.merovius.de/tags/programming/</id><author><name>Axel Wagner</name></author><entry><title type="html">Cleanly merge git repositories</title><link href="https://blog.merovius.de/posts/2022-12-08-cleanly-merge-git-repositories/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-12-08-cleanly-merge-git-repositories/</id><published>2022-12-08T12:05:00+00:00</published><updated>2022-12-08T12:05:00+00:00</updated><content type="html"><![CDATA[<p><em>Note: If you don&rsquo;t want to read the exposition and explanations and just want
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">programming on Mero's Blog</title><link href="https://blog.merovius.de/tags/programming/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/programming/atom.xml"/><updated>2024-01-05T13:57:59+00:00</updated><id>https://blog.merovius.de/tags/programming/</id><author><name>Axel Wagner</name></author><entry><title type="html">Constraining Complexity in the Generics Design</title><link href="https://blog.merovius.de/posts/2024-01-05_constraining_complexity/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2024-01-05_constraining_complexity/</id><published>2024-01-05T08:19:00+01:00</published><updated>2024-01-05T08:19:00+01:00</updated><content type="html"><![CDATA[<script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+<p>I gave a talk at <a href="https://gophercon.com.au/" title="GopherConAU Website">GopherConAU 2023</a> about a particular problem we encountered when designing generics for Go and what we might do about it.</p>
+<p>This blog post is meant as a supplement to that talk.
+It mostly reproduces its content, while giving some supplementary information and more detailed explanations where necessary.</p>
+<p>So if you prefer to ingest your information from text, then this blog post should serve you well.
+If you prefer a talk, <a href="https://www.youtube.com/watch?v=0w4Px-yR8D8" title="Recording of the talk">you can watch the recording</a> and use it to get some additional details in the relevant sections.</p>
+<p>The talk (and hence this post) is also a follow-up to <a href="https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/" title="Previous post: Calculating type sets is harder than you think">a previous blog post of mine</a>.
+But I believe the particular explanation I give here should be a bit more approachable and is also more general.
+If you have read that post and are just interested in the differences, feel free to skip to <a href="#the-type-parameter-problem">the Type Parameter Problem</a>.</p>
+<p>With all that out of the way, let us get into it.</p>
+<h2 id="the-problem">The Problem</h2>
+<p>If you are using Go generics, you are probably aware that it&rsquo;s possible to constrain type parameters.
+This makes sure that a type argument has all the operations that your generic function expects available to it.</p>
+<p>One particular way to constrain a type parameter is using <em>union elements</em>, which allow you to say that a type has to be from some list of types.
+The most common use of this is to allow you to use Go&rsquo;s operators on a generic parameter:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// Allows any type argument that has underlying type int, uint or string.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">type</span> <span class="nx">Ordered</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="err">~</span><span class="kt">int</span> <span class="p">|</span> <span class="err">~</span><span class="kt">uint</span> <span class="p">|</span> <span class="err">~</span><span class="kt">string</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">Max</span><span class="p">[</span><span class="nx">T</span> <span class="nx">Ordered</span><span class="p">](</span><span class="nx">a</span><span class="p">,</span> <span class="nx">b</span> <span class="nx">T</span><span class="p">)</span> <span class="nx">T</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// As all int, uint and string types support the &gt; operator, our generic
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="c1">// function can use it:
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">if</span> <span class="nx">a</span> <span class="p">&gt;</span> <span class="nx">b</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="nx">a</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="nx">b</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>Another case this would be very useful for would be to allow us to call a method as a fallback:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Stringish</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Stringer</span> <span class="p">|</span> <span class="err">~</span><span class="kt">string</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">Stringify</span><span class="p">[</span><span class="nx">T</span> <span class="nx">Stringish</span><span class="p">](</span><span class="nx">v</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">string</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="nx">s</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nf">any</span><span class="p">(</span><span class="nx">v</span><span class="p">).(</span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Stringer</span><span class="p">);</span> <span class="nx">ok</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="nx">s</span><span class="p">.</span><span class="nf">String</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="nx">reflect</span><span class="p">.</span><span class="nf">ValueOf</span><span class="p">(</span><span class="nx">v</span><span class="p">).</span><span class="nf">String</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>However, if we try this, the compiler will complain:</p>
+<blockquote>
+<p>cannot use fmt.Stringer in union (fmt.Stringer contains methods)</p>
+</blockquote>
+<p>And if we check <a href="https://go.dev/ref/spec#General_interfaces" title="Go Language Specification: General interfaces">the spec</a>, we find a specific exception for this:</p>
+<blockquote>
+<p>Implementation restriction: A union (with more than one term) cannot contain the predeclared identifier <code>comparable</code> or interfaces that specify methods, or embed <code>comparable</code> or interfaces that specify methods.</p>
+</blockquote>
+<p>To explain why this restriction is in place, we will dive into a bit of theory.</p>
+<h2 id="some-theory">Some Theory</h2>
+<p>You have probably heard about the <a href="https://en.wikipedia.org/wiki/P_versus_NP_problem" title="Wikipedia: P versus NP problem"><strong>P</strong> versus <strong>NP</strong> problem</a>.
+It concerns two particular classes of computational problems:</p>
+<ul>
+<li><strong>P</strong> is the class of problems that can be <em>solved</em> efficiently<sup id="fnref:1"><a href="#fn:1" class="footnote-ref" role="doc-noteref">1</a></sup>.
+An example  of this is multiplication of integers: If I give you two integers, you can write an algorithm that quickly multiplies them.</li>
+<li><strong>NP</strong> is the class of problems that can be <em>verified</em> efficiently: If you have a candidate for a solution, you can write an efficient algorithm that verifies it.
+An example is factorization: If you give me an integer \(N\) and a prime \(p\), you can efficiently check whether or not it is a factor of \(N\).
+You just divide \(N\) by \(p\) and check whether there is any remainder.</li>
+</ul>
+<p>Every problem in <strong>P</strong> is also in <strong>NP</strong>: If you can efficiently <em>solve</em> a problem, you can also easily <em>verify</em> a solution, by just doing it yourself and comparing the answers.</p>
+<p>However, the opposite is not necessarily true.
+For example, if I give you an integer \(N\) and tell you to give me a non-trivial factor of it, the best you could probably do is try out all possible candidates until you find one.
+This is <em>exponential</em> in the size of the input (an integer with \(k\) digits has on the order of \(10^k\) candidate factors).</p>
+<p>We generally assume that there are in fact problems which are in <strong>NP</strong> but not in <strong>P</strong> - but we have not actually <em>proven</em> so.
+Doing that is the <strong>P</strong> versus <strong>NP</strong> problem.</p>
+<p>While we have not proven that there <em>are</em> such &ldquo;hard&rdquo; problems, we <em>did</em> prove that there are some problems which are &ldquo;at least as hard as any other problem in <strong>NP</strong>&rdquo;.
+This means that if you can solve <em>them</em> efficiently, you can solve <em>any</em> problem in <strong>NP</strong> efficiently.
+These are called &ldquo;<strong>NP</strong>-hard&rdquo; or &ldquo;<strong>NP</strong>-complete&rdquo;<sup id="fnref:2"><a href="#fn:2" class="footnote-ref" role="doc-noteref">2</a></sup>.</p>
+<p>One such problem is the <a href="https://en.wikipedia.org/wiki/Boolean_satisfiability_problem" title="Wikipedia: Boolean Patisfiability Problem">Boolean Satisfiability Problem</a>.
+It asks you to take in a boolean formula - a composition of some boolean variables, connected with &ldquo;and&rdquo;, &ldquo;or&rdquo; and &ldquo;not&rdquo; operators - and determine an assignment to the variables that makes the formula true.</p>
+<p>So, for example, I could ask you to find me a <em>satisfying assignment</em> for this function:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">F</span><span class="p">(</span><span class="nx">x</span><span class="p">,</span> <span class="nx">y</span><span class="p">,</span> <span class="nx">z</span> <span class="kt">bool</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="p">(!</span><span class="nx">x</span> <span class="o">||</span> <span class="nx">z</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="p">(</span><span class="nx">y</span> <span class="o">||</span> <span class="nx">z</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="p">(</span><span class="nx">x</span> <span class="o">||</span> <span class="p">!</span><span class="nx">z</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>For example, <code>F(true, true, false)</code> is <code>false</code>, so it is not a satisfying assignment.
+But <code>F(false, true, false)</code> is <code>true</code>, so that <em>is</em> a satisfying assignment.</p>
+<p>It is easy to verify whether any given assignment satisfies your formula - you just substitute all the variables and evaluate it.
+But to <em>find</em> one, you probably have to try out all possible inputs.
+And for \(n\) variables, you have \(2^n\) different options, so this takes exponential time.</p>
+<p>In practice, this means that if you can show that solving a particular problem would allow you to solve SAT, your problem is <em>itself</em> <strong>NP</strong>-hard: It would be at least as hard as solving SAT, which is at least as hard as solving any other <strong>NP</strong> problem.
+And as we assume that <strong>NP</strong>≠<strong>P</strong>, this means your problem can probably not be solved efficiently.</p>
+<p>The last thing we need to mention is <a href="https://en.wikipedia.org/wiki/Co-NP" title="Wikipedia: co-NP"><strong>co-NP</strong></a>, the class of <em>complements</em> of problems in <strong>NP</strong>.
+The complement of a (decision) problem is simply the same problem, with the answer is inverted: You have to answer &ldquo;yes&rdquo; instead of &ldquo;no&rdquo; and vice versa.
+And where with <strong>NP</strong>, a &ldquo;yes&rdquo; answer should have an efficiently verifiable proof, with <strong>co-NP</strong>, a &ldquo;no&rdquo; answer should have an efficiently verifiable proof.</p>
+<p>Notably, the actual <em>difficulty</em> of solving the problem does not change.
+To decide between &ldquo;yes&rdquo; and &ldquo;no&rdquo; is just as hard, you just turn around the answer.
+So, in a way, this is a technicality.</p>
+<p>A <strong>co-NP</strong> complete problem is simply a problem that is the complement of an <strong>NP</strong> complete problem and as you would expect, it is just as hard and it is at least as hard as any other problem in <strong>co-NP</strong>.</p>
+<p>Now, with the theory out of the way, let&rsquo;s look at Go again.</p>
+<h2 id="the-type-parameter-problem">The Type Parameter Problem</h2>
+<p>When building a Go program, the compiler has to solve a couple of computational problems as well.
+For example, it has to be able to answer &ldquo;does a given type argument satisfy a given constraint&rdquo;.
+This happens if you instantiate a generic function with a concrete type:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">F</span><span class="p">[</span><span class="nx">T</span> <span class="nx">C</span><span class="p">]()</span> <span class="p">{}</span> <span class="c1">// where C is some constraint
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="nf">G</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">F</span><span class="p">[</span><span class="kt">int</span><span class="p">]()</span> <span class="c1">// Allowed if and only if int satisfies C.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span></code></pre></div><p>This problem is in <strong>P</strong>: The compiler can just evaluate the constraint as if it was a logical formula, with <code>|</code> being an &ldquo;or&rdquo; operator, multiple lines being an &ldquo;and&rdquo; operator and checking if the type argument has the right methods or underlying types on the way.</p>
+<p>Another problem it has to be able to solve is whether a given constraint <code>C1</code> <em>implies</em> another constraint <code>C2</code>: Does every type satisfying <code>C1</code> also satisfy <code>C2</code>?
+This comes up if you instantiate a generic function <em>with a type parameter</em>:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">F</span><span class="p">[</span><span class="nx">T</span> <span class="nx">C1</span><span class="p">]()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">G</span><span class="p">[</span><span class="nx">T</span><span class="p">]()</span> <span class="c1">// Allowed if and only if C1 implies C2
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">G</span><span class="p">[</span><span class="nx">T</span> <span class="nx">C2</span><span class="p">]()</span> <span class="p">{}</span>
+</span></span></code></pre></div><p>My claim now is that this problem (which I will call the &ldquo;Type Parameter Problem&rdquo; for the purposes of this post) is <strong>co-NP</strong> complete<sup id="fnref:3"><a href="#fn:3" class="footnote-ref" role="doc-noteref">3</a></sup>.</p>
+<p>To prove this claim, we <em>reduce</em> SAT to the (complement of the) Type Parameter Problem.
+We show that if we <em>had</em> a Go compiler which solves this problem, we can use it so solve the SAT problem as well.
+And we do that, by translating an arbitrary boolean formula into a Go program and then check whether it compiles.</p>
+<p>On a technical note, we are going to assume that the fomula is in <a href="https://en.wikipedia.org/wiki/Conjunctive_normal_form" title="Wikipedia: Conjunctive Normal Form">Conjunctive Normal Form (CNF)</a>:
+A list of terms connected with &ldquo;and&rdquo; operators, where each term is a list of (possibly negated) variables connected with &ldquo;or&rdquo; terms.
+The example I used above is in CNF and we use it as an example to demonstrate the translation:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">F</span><span class="p">(</span><span class="nx">x</span><span class="p">,</span> <span class="nx">y</span><span class="p">,</span> <span class="nx">z</span> <span class="kt">bool</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="p">(!</span><span class="nx">x</span> <span class="o">||</span> <span class="nx">z</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="p">(</span><span class="nx">y</span> <span class="o">||</span> <span class="nx">z</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="p">(</span><span class="nx">x</span> <span class="o">||</span> <span class="p">!</span><span class="nx">z</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>This assumption may seem like a cheat, but importantly,
+<a href="https://en.wikipedia.org/wiki/Boolean_satisfiability_problem#Conjunctive_normal_form_2" title="Wikipedia: SAT for CNF">SAT is still <strong>NP</strong>-complete with it</a>.</p>
+<p>The first step in our reduction is to model our boolean variables.
+Every variable can be either true or false and it can appear negated or not negated.
+We encode that by defining two interfaces per variable<sup id="fnref:3"><a href="#fn:3" class="footnote-ref" role="doc-noteref">3</a></sup>:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">X</span> <span class="kd">interface</span> <span class="p">{</span> <span class="nf">X</span><span class="p">()</span> <span class="p">}</span>     <span class="c1">// X is assigned &#34;true&#34;
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">type</span> <span class="nx">NotX</span> <span class="kd">interface</span><span class="p">{</span> <span class="nf">NotX</span><span class="p">()}</span> <span class="c1">// X is assigned &#34;false&#34;
+</span></span></span></code></pre></div><p>This allows us to translate our formula directly, using union elements for &ldquo;or&rdquo; and interface-embedding for &ldquo;and&rdquo;:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// Represents (!x || z) &amp;&amp; (y || z) &amp;&amp; (x || !z)
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">type</span> <span class="nx">Formula</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">NotX</span> <span class="p">|</span> <span class="nx">Z</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">Y</span> <span class="p">|</span> <span class="nx">Z</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">X</span> <span class="p">|</span> <span class="nx">NotZ</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>There are, however, two issues with this:</p>
+<ol>
+<li>A type could have <em>neither</em> of <code>X()</code> and <code>NotX()</code>.</li>
+<li>A type could have <em>both</em> of <code>X()</code> and <code>NotX()</code>.</li>
+</ol>
+<p>This breaks our representation, because a boolean variable always has to be <em>exactly</em> true or false - <a href="https://en.wikipedia.org/wiki/Law_of_excluded_middle" title="Wikipedia: Law of excluded middle">it can&rsquo;t be neither and it can&rsquo;t be both</a>.</p>
+<p>To address the first point, we define another interface:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">AtLeastOne</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">X</span> <span class="p">|</span> <span class="nx">NotX</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">Y</span> <span class="p">|</span> <span class="nx">NotY</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">Z</span> <span class="p">|</span> <span class="nx">NotZ</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>Any type satisfying <code>AtLeastOne</code> has to assign at least one of true and false to each variable.</p>
+<p>Similarly, we define an interface to address the second problem:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Both_X</span> <span class="kd">interface</span> <span class="p">{</span> <span class="nx">X</span><span class="p">;</span> <span class="nx">NotX</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Both_Y</span> <span class="kd">interface</span> <span class="p">{</span> <span class="nx">Y</span><span class="p">;</span> <span class="nx">NotY</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Both_Z</span> <span class="kd">interface</span> <span class="p">{</span> <span class="nx">Z</span><span class="p">;</span> <span class="nx">NotZ</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Both</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">Both_X</span> <span class="p">|</span> <span class="nx">Both_Y</span> <span class="p">|</span> <span class="nx">Both_Z</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>Any type satisfying <code>Both</code> now assigns both true <em>and</em> false to at least one variable.</p>
+<p>To represent a valid, satisfying assignment, a type thus has to</p>
+<ol>
+<li>satisfy <code>Formula</code></li>
+<li>satisfy <code>AtLeastOne</code></li>
+<li><em>not</em> satisfy <code>Both</code></li>
+</ol>
+<p>Now, we ask our compiler to type-check this Go program<sup id="fnref:4"><a href="#fn:4" class="footnote-ref" role="doc-noteref">4</a></sup>:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">G</span><span class="p">[</span><span class="nx">T</span> <span class="nx">Both</span><span class="p">]()</span> <span class="p">{}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">F</span><span class="p">[</span><span class="nx">T</span> <span class="kd">interface</span><span class="p">{</span> <span class="nx">Formula</span><span class="p">;</span> <span class="nx">AtLeastOne</span> <span class="p">}]()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">G</span><span class="p">[</span><span class="nx">T</span><span class="p">]()</span> <span class="c1">// Allowed if and only if (Formula &amp;&amp; AtLeastOne) =&gt; Both
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span></code></pre></div><p>This program should compile, if and only if any type satisfying <code>Formula</code> and <code>AtLeastOne</code> also satisfies <code>Both</code>.
+Because we are looking at the <em>complement</em> of SAT, we invert this, to get our final answer:</p>
+<pre tabindex="0"><code>    !( (Formula &amp;&amp; AtLeastOne) =&gt;  Both )
+&lt;=&gt; !(!(Formula &amp;&amp; AtLeastOne) ||  Both ) // &#34;A =&gt; B&#34; is equivalent to &#34;!A || B&#34;
+&lt;=&gt; !(!(Formula &amp;&amp; AtLeastOne  &amp;&amp; !Both)) // De Morgan&#39;s law
+&lt;=&gt;     Formula &amp;&amp; AtLeastOne  &amp;&amp; !Both   // Double negation
+</code></pre><p>This finishes our reduction: The compiler should reject the program, if and only if the formula has a satisfying assignment.
+The Type Parameter Problem is at least as hard as the complement of SAT.</p>
+<h2 id="going-forward">Going forward</h2>
+<p>So the restriction on methods in union elements is in place, because we are concerned about type checking Go would become a very hard problem if we allowed them.
+But that is, of course, a deeply dissatisfying situation.</p>
+<p>Our <code>Stringish</code> example would clearly be a very useful constraint - so useful, in fact, that it was used <a href="https://go.googlesource.com/proposal/+/HEAD/design/43651-type-parameters.md#interface-types-in-union-elements" title="Type Parameter Proposal: Interface types in union elements">an example in the original design doc</a>.
+More generally, this restriction prevents us from having a good way to <a href="https://blog.merovius.de/posts/2022-05-23-operator-constraints/" title="Previous post: Operator Constraints">express operator constraints for generic functions and types</a>.
+We currently end up writing multiple versions of the same functions, one that uses operators and one that takes functions to do the operations.
+This leads to boilerplate and extra API surface<sup id="fnref:5"><a href="#fn:5" class="footnote-ref" role="doc-noteref">5</a></sup>.</p>
+<p><a href="https://pkg.go.dev/slices" title="Go standard library slices package documentation">The slices package</a> contains a bunch of examples like that (look for the <code>Func</code> suffix to the name):</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// Uses the == operator. Useful for predeclared types (int, string,…) and
+</span></span></span><span class="line"><span class="cl"><span class="c1">// structs/arrays of those.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="nx">Contains</span><span class="p">[</span><span class="nx">S</span> <span class="err">~</span><span class="p">[]</span><span class="nx">E</span><span class="p">,</span> <span class="nx">E</span> <span class="nx">comparable</span><span class="p">](</span><span class="nx">s</span> <span class="nx">S</span><span class="p">,</span> <span class="nx">v</span> <span class="nx">E</span><span class="p">)</span> <span class="kt">bool</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// Uses f. Needed for slices, maps, comparing by pointer-value or other notions
+</span></span></span><span class="line"><span class="cl"><span class="c1">// of equality.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="nx">ContainsFunc</span><span class="p">[</span><span class="nx">S</span> <span class="err">~</span><span class="p">[]</span><span class="nx">E</span><span class="p">,</span> <span class="nx">E</span> <span class="nx">any</span><span class="p">](</span><span class="nx">s</span> <span class="nx">S</span><span class="p">,</span> <span class="nx">f</span> <span class="kd">func</span><span class="p">(</span><span class="nx">E</span><span class="p">)</span> <span class="kt">bool</span><span class="p">)</span> <span class="kt">bool</span>
+</span></span></code></pre></div><p>So we should consider compromises, allowing us to get <em>some</em> of the power of removing this restriction at least.</p>
+<h3 id="option-1-ignore-the-problem">Option 1: Ignore the problem</h3>
+<p>This might be a surprising option to consider after spending all these words on demonstrating that this problem is hard to solve, but we can at least consider it:
+We simply say that a Go compiler has to include <em>some form</em> of (possibly limited) SAT solver and is allowed to just give up after some time, if it can not find a proof that a program is safe.</p>
+<p>C++ concepts do this.
+A C++ compiler has to determine if one constraint implies another one, when it has to decide which of multiple overloaded generic functions to invoke.
+<a href="https://en.cppreference.com/w/cpp/language/constraints#Partial_ordering_of_constraints" title="C++ Reference: Partial ordering of constraints">And it does so using a simple SAT solver</a>.
+In particular, if it wants to prove \(P ⇒ Q\), it first converts \(P\) into <a href="https://en.wikipedia.org/wiki/Disjunctive_normal_form" title="Wikipedia: Disjunctive Normal Form">Disjunctive Normal Form (DNF)</a> and then convert \(Q\) into <a href="https://en.wikipedia.org/wiki/Conjunctive_normal_form" title="Wikipedia: Conjunctive Normal Form">Conjunctive Normal Form (CNF)</a>.</p>
+<p>With \(P\) in DNF and \(Q\) in DNF, \(P ⇒ Q\) is easy to prove (and disprove).
+But this normalization into DNF or CNF <em>itself</em> requires exponential time in general.
+And you can indeed create C++ programs that crash C++ compilers.</p>
+<p>Personally, I find all versions of this option very dissatisfying:</p>
+<ul>
+<li>Leaving the heuristic up to the implementation feels like too much wiggle-room for what makes a valid Go program.</li>
+<li>Describing an explicit heuristic in the spec takes up a lot of the complexity budget of the spec.</li>
+<li>Allowing the compiler to try and give up after some time feels antithetical to the pride Go takes in fast compilation.</li>
+</ul>
+<h3 id="option-2-limit-the-expressiveness-of-interfaces">Option 2: Limit the expressiveness of interfaces</h3>
+<p>For the interfaces as they exist today, we actually <em>can</em> solve the SAT problem: Any interface can ultimately be represented in the form (with some elements perhaps being empty):</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">A</span> <span class="p">|</span> <span class="err">…</span> <span class="p">|</span> <span class="nx">C</span> <span class="p">|</span> <span class="err">~</span><span class="nx">X</span> <span class="p">|</span> <span class="err">…</span> <span class="p">|</span> <span class="err">~</span><span class="nx">Z</span> <span class="c1">// for some concrete types
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="nx">comparable</span>
+</span></span><span class="line"><span class="cl">    <span class="nf">M1</span><span class="p">(</span><span class="err">…</span><span class="p">)</span> <span class="p">(</span><span class="err">…</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// …
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="nf">Mn</span><span class="p">(</span><span class="err">…</span><span class="p">)</span> <span class="p">(</span><span class="err">…</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>And it is straight-forward to use this representation to do the kind of inference we need.</p>
+<p>This tells us that there are <em>some</em> restrictions we can put on the kinds of interfaces we can write down, while still not running into the kinds of problems discussed in this post.
+That&rsquo;s because every such kind of interfaces gives us a restricted <em>sub problem</em> of SAT, which only looks at formulas conforming to some extra restrictions.</p>
+<p>One example of such a sub problem we actually used above, where we assumed that our formula is in Conjunctive Normal Form.
+Another important such sub problem is the one where the formulas are in <a href="https://en.wikipedia.org/wiki/Disjunctive_normal_form" title="Wikipedia: Disjunctive Normal Form"><em>Disjunctive</em> Normal Form</a> instead:
+Where we have a list of terms linked with &ldquo;or&rdquo; operators and each term is a list of (possibly negated) variables linked with &ldquo;and&rdquo; operators. For DNF, <a href="https://en.wikipedia.org/wiki/Boolean_satisfiability_problem#Disjunctive_normal_form" title="Wikipedia: SAT for DNF">the SAT problem is efficiently solvable</a>.</p>
+<p>We could take advantage of that by allowing union elements to contain methods - but only if</p>
+<ol>
+<li>There is exactly one union in the top-level interface.</li>
+<li>The interfaces embedded in that union are &ldquo;easy&rdquo; interfaces, i.e. ones we allow today.</li>
+</ol>
+<p>So, for example</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Stringish</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// Allowed: fmt.Stringer and ~string are both allowed today
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Stringer</span> <span class="p">|</span> <span class="err">~</span><span class="kt">string</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">A</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// Not Allowed: Stringish is not allowed today, so we have more than one level
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="nx">Stringish</span> <span class="p">|</span> <span class="err">~</span><span class="kt">int</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">B</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// Allowed: Same as A, but we &#34;flattened&#34; it, so each element is an
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="c1">// &#34;easy&#34; interface.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Stringer</span> <span class="p">|</span> <span class="err">~</span><span class="kt">string</span> <span class="p">|</span> <span class="err">~</span><span class="kt">int</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">C</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// Not Allowed: Can only have a single union (or must be an &#34;easy&#34; interface)
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Stringer</span> <span class="p">|</span> <span class="err">~</span><span class="kt">string</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">comparable</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>This restriction makes our interfaces be in DNF, in a sense.
+It&rsquo;s just that every &ldquo;variable&rdquo; of our DNF is itself an &ldquo;easy&rdquo; interface.
+If we need to solve SAT for one of these, we first solve it on the SAT formula to determine which &ldquo;easy&rdquo; interfaces need to be satisfied and then use our current algorithms to check which of those <em>can</em> be satisfied.</p>
+<p>Of course, this restriction is somewhat hard to explain.
+But it would allow us to write at least some of the useful programs we want to use this feature for.
+And we might find another set of restrictions that are easier to explain but still allow that.</p>
+<p>We should probably try to collect some useful programs that we would want to write with this feature and then see, for some restricted interface languages if they allow us to write them.</p>
+<h3 id="option-3-make-the-type-checker-conservative">Option 3: Make the type-checker conservative</h3>
+<p>For our reduction, we assumed that the compiler should allow the program if <em>and only if</em> it can prove that every type satisfying <code>C1</code> also satisfies <code>C2</code>.</p>
+<p>We could allow it to reject some programs that <em>would</em> be valid, though.
+Wec could describe an algorithm for determining if <code>C1</code> implies <code>C2</code> that can have false negatives: Rejecting a theoretically safe program, just because it cannot <em>prove</em> that it is safe with that algorithm, requiring you to re-write your program into something it can handle more easily.</p>
+<p>Ultimately, this is kind of what a type system does: It gives you a somewhat limited language to write a proof to the compiler that your program is &ldquo;safe&rdquo;, in the sense that it satisfies certain invariants.
+And if you accidentally pass a variable of the wrong type - even if your program would still be perfectly valid - you might have to add a conversion or call some function that verifies its invariants, before being allowed to do so.</p>
+<p>For this route, we still have to decide <em>which</em> false negatives we are willing to accept though: What is the algorithm the compiler should use?</p>
+<p>For some cases, this is trivial.
+For example, this should obviously compile:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">StringifyAll</span><span class="p">[</span><span class="nx">T</span> <span class="nx">Stringish</span><span class="p">](</span><span class="nx">vals</span> <span class="o">...</span><span class="nx">T</span><span class="p">)</span> <span class="p">[]</span><span class="kt">string</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">out</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">string</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">vals</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">    <span class="k">for</span> <span class="nx">i</span><span class="p">,</span> <span class="nx">v</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">vals</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="c1">// Stringify as above. Should be allowed, as T uses the same constraint
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="c1">// as Stringify.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="nx">out</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">=</span> <span class="nf">Stringify</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="nx">out</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>But other cases are not as straight forward and require <em>some</em> elaboration:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">Marshal</span><span class="p">[</span><span class="nx">T</span> <span class="nx">Stringish</span> <span class="p">|</span> <span class="err">~</span><span class="kt">bool</span> <span class="p">|</span> <span class="nx">constraints</span><span class="p">.</span><span class="nx">Integer</span><span class="p">](</span><span class="nx">v</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">string</span> <span class="p">{</span> <span class="cm">/* … */</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// Stringish appears in the union of the target constraint.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="nx">F</span><span class="p">[</span><span class="nx">T</span> <span class="nx">Stringish</span><span class="p">](</span><span class="nx">v</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">string</span> <span class="p">{</span> <span class="k">return</span> <span class="nx">Marshal</span><span class="p">[</span><span class="nx">T</span><span class="p">](</span><span class="nx">v</span><span class="p">)</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// string has underlying type string and fmt.Stringer is the Stringish union.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="nx">G</span><span class="p">[</span><span class="nx">T</span> <span class="kt">string</span><span class="p">|</span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Stringer</span><span class="p">](</span><span class="nx">v</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">string</span> <span class="p">{</span> <span class="k">return</span> <span class="nx">Marshal</span><span class="p">[</span><span class="nx">T</span><span class="p">](</span><span class="nx">v</span><span class="p">)</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// The method name is just a different representation of fmt.Stringer
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="nx">H</span><span class="p">[</span><span class="nx">T</span> <span class="kd">interface</span><span class="p">{</span> <span class="nf">String</span><span class="p">()</span> <span class="kt">string</span> <span class="p">}](</span><span class="nx">v</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">string</span> <span class="p">{</span> <span class="k">return</span> <span class="nx">Marshal</span><span class="p">[</span><span class="nx">T</span><span class="p">](</span><span class="nx">v</span><span class="p">)</span> <span class="p">}</span>
+</span></span></code></pre></div><p>These examples are still simple, but they are useful, so should probably be allowed.
+But they already show that there is <em>somewhat</em> complex inference needed: Some terms on the left might satisfy some terms on the right, but we can not simply compare them as a subset relation, we actually have to take into account the different cases.</p>
+<p>And remember that converting to DNF or CNF takes exponential time, so the simple answer of &ldquo;convert the left side into DNF and the right side into CNF, then check each term individually&rdquo; does not solve our problem.</p>
+<p>In practice, this option has a large intersection with the previous one: The algorithm would probably reject programs that use interfaces with too complex a structure on either side, to guarantee that it terminates quickly.
+But it would allow us, in principle, to use <em>different</em> restrictions for the left and the right hand side: Allow you to write <em>any</em> interface and only check the structure if you actually use them in a way that would make inference impossible.</p>
+<p>We have to decide whether we would find that acceptable though, or whether it seems to confusing in practice.
+Describing the algorithm also would take quite a lot of space and complexity budget in the spec.</p>
+<h3 id="future-proofing">Future-proofing</h3>
+<p>Lastly, when we talk about this we should keep in mind possible future extensions to the generics design.</p>
+<p>For example, there is a proposal by Rog Peppe to <a href="https://github.com/golang/go/issues/45380" title="Go language change proposal: Type switch on parametric types">add a type-switch on type parameters</a>.
+The proposal is to add a new type switch syntax for type parameters, where every case has a new constraint and in that branch, you could use the type parameter <em>as if it was further constrained by that</em>.
+So, for example, it would allow us to rewrite <code>Stringify</code> without <code>reflect</code>:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">Stringify</span><span class="p">[</span><span class="nx">T</span> <span class="nx">Stringish</span><span class="p">](</span><span class="nx">v</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">string</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">switch</span> <span class="kd">type</span> <span class="nx">T</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="nx">fmt</span><span class="p">.</span><span class="nx">Stringer</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">        <span class="c1">// T is constrained by Stringish *and* fmt.Stringer. So just fmt.Stringer
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="c1">// Calling String on a fmt.Stringer is allowed.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="k">return</span> <span class="nx">v</span><span class="p">.</span><span class="nf">String</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="err">~</span><span class="kt">string</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">        <span class="c1">// T is consrtained by Stringish *and* ~string. So just ~string
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="c1">// Converting a ~string to string is allowed.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="k">return</span> <span class="nb">string</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>The crux here is, that this proposal allows us to create new, implicit interfaces out of old ones.</p>
+<p>If we restrict the structure of our interfaces, these implicit interfaces might violate this structure.
+And if we make the type checker more conservative, a valid piece of code might no longer be valid if copied into a type parameter switch, if the implicit constraints would lead to a generic all the compiler can&rsquo;t prove to be safe.</p>
+<p>Of course it is impossible to know what extension we <em>really</em> want to add in the future.
+But we should at least consider some likely candidates during the discussion.</p>
+<h2 id="summary">Summary</h2>
+<p>I hope I convinced you that</p>
+<ol>
+<li>Simply allowing methods in unions would make type-checking Go code <strong>co-NP</strong> hard.</li>
+<li>But we might be able to find <em>some</em> compromise that still allows us to do <em>some</em> of the things we want to use this for.</li>
+<li>The devil is in the details and we still have to think hard and carefully about those.</li>
+</ol>
+<section class="footnotes" role="doc-endnotes">
+<hr>
+<ol>
+<li id="fn:1" role="doc-endnote">
+<p>&ldquo;efficient&rdquo;, in this context, means &ldquo;in polynomial time in the size of the input&rdquo;.</p>
+<p>In general, if an input to an algorithm gets larger, the time it needs to run grows.
+We can look at how fast this growth is, how long the algorithm takes by the size of the input.
+And if that growth is at most polynomial, we consider that &ldquo;efficient&rdquo;, in this context.</p>
+<p>In practice, even many polynomial growth functions are too slow for our taste.
+But we still make this qualitative distinction in complexity theory.&#160;<a href="#fnref:1" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:2" role="doc-endnote">
+<p>The difference between these two terms is that &ldquo;<strong>NP</strong>-hard&rdquo; means &ldquo;at least as difficult than any problem in <strong>NP</strong>&rdquo;.
+While &ldquo;<strong>NP</strong>-complete&rdquo; means &ldquo;<strong>NP</strong>-hard and also <em>itself</em> in <strong>NP</strong>&rdquo;.</p>
+<p>So an <strong>NP</strong>-hard problem might indeed be <em>even harder</em> than other problems in <strong>NP</strong>, while an <strong>NP</strong>-complete problem is not.</p>
+<p>For us, the difference does not really matter.
+All problems we talk about are in <strong>NP</strong>.&#160;<a href="#fnref:2" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:3" role="doc-endnote">
+<p>If you have read <a href="https://blog.merovius.de/posts/2022-05-16-calculating-type-sets/" title="Previous post: Calculating type sets is harder than you think">my previous post on the topic</a>, you might notice a difference here.
+Previously, I defined <code>NotX</code> as <code>interface{ X() int }</code> and relied on this being mutually exclusive with <code>X</code>: You can&rsquo;t have two methods with the same name but different signatures.</p>
+<p>This is one reason I think this proof is nicer than my previous one.
+It does not require &ldquo;magical&rdquo; knowledge like that, instead <em>only</em> requiring you to be able to define interfaces with arbitrary method names.
+Which is extremely open.&#160;<a href="#fnref:3" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:4" role="doc-endnote">
+<p>The other reason I like this proof better than my previous one is that it no longer relies on the abstract problem of &ldquo;proving that a type set is empty&rdquo;.
+While the <a href="https://en.wikipedia.org/wiki/Principle_of_explosion" title="Wikipedia: Principle of explosion">principle of explosion</a> is familiar to Mathematicians, it is hard to take its implications seriously if you are not.</p>
+<p>Needing to type-check a generic function call is far more obvious as a problem that <em>needs</em> solving and it is easier to find understandable examples.&#160;<a href="#fnref:4" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:5" role="doc-endnote">
+<p>And inefficiencies, as calling a method on a type parameter can often be devirtualized and/or inlined.
+A <code>func</code> value sometimes can&rsquo;t.
+For example if it is stored in a field of a generic type, the compiler is usually unable to prove that it doesn&rsquo;t change at runtime.&#160;<a href="#fnref:5" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+</ol>
+</section>
+]]></content></entry><entry><title type="html">Cleanly merge git repositories</title><link href="https://blog.merovius.de/posts/2022-12-08-cleanly-merge-git-repositories/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2022-12-08-cleanly-merge-git-repositories/</id><published>2022-12-08T12:05:00+00:00</published><updated>2022-12-08T12:05:00+00:00</updated><content type="html"><![CDATA[<p><em>Note: If you don&rsquo;t want to read the exposition and explanations and just want
 to know the steps I did, scroll to the summary at the bottom.</em></p>
 <p>For a couple of years I have (with varying degrees of commitment) participated
 in <a href="https://adventofcode.com/">Advent of Code</a>, a yearly programming
