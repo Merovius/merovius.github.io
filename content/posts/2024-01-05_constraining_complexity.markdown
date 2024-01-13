@@ -9,6 +9,8 @@ summary: A supplementary post to my GopherConAU 2023 talk of the same title.
 
 <script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"></script>
 
+*[2024-01-13: I added [a section](#option-4-delay-constraint-checking-until-instantiation) with an option I forgot to put into my talk and thus elided from the initial post as well.]*
+
 I gave a talk at [GopherConAU 2023][GopherConAU] about a particular problem we encountered when designing generics for Go and what we might do about it.
 
 This blog post is meant as a supplement to that talk.
@@ -286,7 +288,7 @@ A C++ compiler has to determine if one constraint implies another one, when it h
 [And it does so using a simple SAT solver][cppref].
 In particular, if it wants to prove \\(P ⇒ Q\\), it first converts \\(P\\) into [Disjunctive Normal Form (DNF)][DNF] and then convert \\(Q\\) into [Conjunctive Normal Form (CNF)][CNF].
 
-With \\(P\\) in DNF and \\(Q\\) in DNF, \\(P ⇒ Q\\) is easy to prove (and disprove).
+With \\(P\\) in DNF and \\(Q\\) in CNF, \\(P ⇒ Q\\) is easy to prove (and disprove).
 But this normalization into DNF or CNF *itself* requires exponential time in general.
 And you can indeed create C++ programs that crash C++ compilers.
 
@@ -409,6 +411,59 @@ But it would allow us, in principle, to use *different* restrictions for the lef
 
 We have to decide whether we would find that acceptable though, or whether it seems to confusing in practice.
 Describing the algorithm also would take quite a lot of space and complexity budget in the spec.
+
+### Option 4: Delay constraint checking until instantiation
+
+One option I forgot to bring up in my talk is essentially the opposite of the previous one:
+We could have the compiler skip checking the constraints of generic function calls in generic functions altogether.
+So, for example, this code would be valid:
+
+```go
+func G[T fmt.Stringer](v T) string {
+    return v.String()
+}
+
+func F[T any](v T) string {
+    // T constrained on any does not satisfy fmt.Stringer.
+    // But we allow the call anyways, for now.
+    return G(v)
+}
+```
+
+To retain type-safety, we would instead check the constraints only when `F` is *instantiated* with a concrete type:
+
+```go
+func main() {
+    F(time.Second) // Valid: time.Duration implements fmt.Stringer
+    F(42)          // Invalid: int does not implement fmt.Stringer
+}
+```
+
+The upside is that this seems very easy to implement.
+It means we completely ignore any questions that require us to do inference on "sets of all types".
+We only ever need to answer whether a specific type satisfies a specific constraint.
+Which we know we can do efficiently.
+
+The downside is that this effectively introduces new constraints on the type-parameter of `F` *implicitly*.
+The signature says that `F` can be instantiated with `any` type, but it *actually* requires a `fmt.Stringer`.
+
+One consequence of that is that it becomes harder to figure out what type arguments are allowed for a generic function or type.
+An instantiation might fail and the only way to understand why is to look into the code of the function you are calling.
+Potentially multiple layers of dependency deep.
+
+Another consequence is that it means your program might break because of a seemingly innocuous change in a dependency.
+A library author might add a generic call to one of their functions.
+Because it only changes the implementation and not the API, they assume that this is a backwards compatible change.
+Their tests pass, because none of the types they use in their tests triggers this change in behavior.
+So they release a new minor version of their library.
+Then you upgrade (perhaps by way of upgrading *another* library that also depends on it) and your code no longer compiles, because you use a different type - conforming to the actual constraints from the signature, but not the implicit ones several layers of dependency down.
+
+Because of this breakage in encapsulation, Go generics have so far eschewed this idea of delayed constraint checking.
+But it is possible that we could find a compromise here:
+Check the most common and easy to handle cases statically, while delaying some of the more complex and uncommon ones until instantiation.
+Where to draw that line would then be open for discussion.
+
+Personally, just like with Option 1, I dislike this idea. But we should keep it in mind.
 
 ### Future-proofing
 
