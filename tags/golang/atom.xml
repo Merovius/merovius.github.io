@@ -1,4 +1,5 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">golang on Mero's Blog</title><link href="https://blog.merovius.de/tags/golang/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/golang/atom.xml"/><updated>2024-01-05T14:13:43+00:00</updated><id>https://blog.merovius.de/tags/golang/</id><author><name>Axel Wagner</name></author><entry><title type="html">Constraining Complexity in the Generics Design</title><link href="https://blog.merovius.de/posts/2024-01-05_constraining_complexity/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2024-01-05_constraining_complexity/</id><published>2024-01-05T08:19:00+01:00</published><updated>2024-01-05T08:19:00+01:00</updated><content type="html"><![CDATA[<script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">golang on Mero's Blog</title><link href="https://blog.merovius.de/tags/golang/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/golang/atom.xml"/><updated>2024-01-13T10:18:06+00:00</updated><id>https://blog.merovius.de/tags/golang/</id><author><name>Axel Wagner</name></author><entry><title type="html">Constraining Complexity in the Generics Design</title><link href="https://blog.merovius.de/posts/2024-01-05_constraining_complexity/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2024-01-05_constraining_complexity/</id><published>2024-01-05T08:19:00+01:00</published><updated>2024-01-05T08:19:00+01:00</updated><content type="html"><![CDATA[<script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+<p><em>[2024-01-13: I added <a href="#option-4-delay-constraint-checking-until-instantiation">a section</a> with an option I forgot to put into my talk and thus elided from the initial post as well.]</em></p>
 <p>I gave a talk at <a href="https://gophercon.com.au/" title="GopherConAU Website">GopherConAU 2023</a> about a particular problem we encountered when designing generics for Go and what we might do about it.</p>
 <p>This blog post is meant as a supplement to that talk.
 It mostly reproduces its content, while giving some supplementary information and more detailed explanations where necessary.</p>
@@ -187,7 +188,7 @@ We simply say that a Go compiler has to include <em>some form</em> of (possibly 
 A C++ compiler has to determine if one constraint implies another one, when it has to decide which of multiple overloaded generic functions to invoke.
 <a href="https://en.cppreference.com/w/cpp/language/constraints#Partial_ordering_of_constraints" title="C++ Reference: Partial ordering of constraints">And it does so using a simple SAT solver</a>.
 In particular, if it wants to prove \(P ⇒ Q\), it first converts \(P\) into <a href="https://en.wikipedia.org/wiki/Disjunctive_normal_form" title="Wikipedia: Disjunctive Normal Form">Disjunctive Normal Form (DNF)</a> and then convert \(Q\) into <a href="https://en.wikipedia.org/wiki/Conjunctive_normal_form" title="Wikipedia: Conjunctive Normal Form">Conjunctive Normal Form (CNF)</a>.</p>
-<p>With \(P\) in DNF and \(Q\) in DNF, \(P ⇒ Q\) is easy to prove (and disprove).
+<p>With \(P\) in DNF and \(Q\) in CNF, \(P ⇒ Q\) is easy to prove (and disprove).
 But this normalization into DNF or CNF <em>itself</em> requires exponential time in general.
 And you can indeed create C++ programs that crash C++ compilers.</p>
 <p>Personally, I find all versions of this option very dissatisfying:</p>
@@ -278,6 +279,44 @@ But they already show that there is <em>somewhat</em> complex inference needed: 
 But it would allow us, in principle, to use <em>different</em> restrictions for the left and the right hand side: Allow you to write <em>any</em> interface and only check the structure if you actually use them in a way that would make inference impossible.</p>
 <p>We have to decide whether we would find that acceptable though, or whether it seems to confusing in practice.
 Describing the algorithm also would take quite a lot of space and complexity budget in the spec.</p>
+<h3 id="option-4-delay-constraint-checking-until-instantiation">Option 4: Delay constraint checking until instantiation</h3>
+<p>One option I forgot to bring up in my talk is essentially the opposite of the previous one:
+We could have the compiler skip checking the constraints of generic function calls in generic functions altogether.
+So, for example, this code would be valid:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">G</span><span class="p">[</span><span class="nx">T</span> <span class="nx">fmt</span><span class="p">.</span><span class="nx">Stringer</span><span class="p">](</span><span class="nx">v</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">string</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="nx">v</span><span class="p">.</span><span class="nf">String</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">F</span><span class="p">[</span><span class="nx">T</span> <span class="nx">any</span><span class="p">](</span><span class="nx">v</span> <span class="nx">T</span><span class="p">)</span> <span class="kt">string</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// T constrained on any does not satisfy fmt.Stringer.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="c1">// But we allow the call anyways, for now.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">return</span> <span class="nf">G</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>To retain type-safety, we would instead check the constraints only when <code>F</code> is <em>instantiated</em> with a concrete type:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nf">F</span><span class="p">(</span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">)</span> <span class="c1">// Valid: time.Duration implements fmt.Stringer
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="nf">F</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>          <span class="c1">// Invalid: int does not implement fmt.Stringer
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span></code></pre></div><p>The upside is that this seems very easy to implement.
+It means we completely ignore any questions that require us to do inference on &ldquo;sets of all types&rdquo;.
+We only ever need to answer whether a specific type satisfies a specific constraint.
+Which we know we can do efficiently.</p>
+<p>The downside is that this effectively introduces new constraints on the type-parameter of <code>F</code> <em>implicitly</em>.
+The signature says that <code>F</code> can be instantiated with <code>any</code> type, but it <em>actually</em> requires a <code>fmt.Stringer</code>.</p>
+<p>One consequence of that is that it becomes harder to figure out what type arguments are allowed for a generic function or type.
+An instantiation might fail and the only way to understand why is to look into the code of the function you are calling.
+Potentially multiple layers of dependency deep.</p>
+<p>Another consequence is that it means your program might break because of a seemingly innocuous change in a dependency.
+A library author might add a generic call to one of their functions.
+Because it only changes the implementation and not the API, they assume that this is a backwards compatible change.
+Their tests pass, because none of the types they use in their tests triggers this change in behavior.
+So they release a new minor version of their library.
+Then you upgrade (perhaps by way of upgrading <em>another</em> library that also depends on it) and your code no longer compiles, because you use a different type - conforming to the actual constraints from the signature, but not the implicit ones several layers of dependency down.</p>
+<p>Because of this breakage in encapsulation, Go generics have so far eschewed this idea of delayed constraint checking.
+But it is possible that we could find a compromise here:
+Check the most common and easy to handle cases statically, while delaying some of the more complex and uncommon ones until instantiation.
+Where to draw that line would then be open for discussion.</p>
+<p>Personally, just like with Option 1, I dislike this idea. But we should keep it in mind.</p>
 <h3 id="future-proofing">Future-proofing</h3>
 <p>Lastly, when we talk about this we should keep in mind possible future extensions to the generics design.</p>
 <p>For example, there is a proposal by Rog Peppe to <a href="https://github.com/golang/go/issues/45380" title="Go language change proposal: Type switch on parametric types">add a type-switch on type parameters</a>.
