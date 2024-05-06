@@ -1,4 +1,45 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">programming on Mero's Blog</title><link href="https://blog.merovius.de/tags/programming/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/programming/atom.xml"/><updated>2024-02-22T05:43:13+00:00</updated><id>https://blog.merovius.de/tags/programming/</id><author><name>Axel Wagner</name></author><entry><title type="html">Constraining Complexity in the Generics Design</title><link href="https://blog.merovius.de/posts/2024-01-05_constraining_complexity/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2024-01-05_constraining_complexity/</id><published>2024-01-05T08:19:00+01:00</published><updated>2024-01-05T08:19:00+01:00</updated><content type="html"><![CDATA[<script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"><generator uri="https://gohugo.io/" version="0.96.0">Hugo</generator><title type="html">programming on Mero's Blog</title><link href="https://blog.merovius.de/tags/programming/"/><link type="application/atom+xml" rel="self" href="https://blog.merovius.de/tags/programming/atom.xml"/><updated>2024-05-06T05:23:05+00:00</updated><id>https://blog.merovius.de/tags/programming/</id><author><name>Axel Wagner</name></author><entry><title type="html">Constraining Go type parameter pointers</title><link href="https://blog.merovius.de/posts/2024-05-06-pointer-constraints/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2024-05-06-pointer-constraints/</id><published>2024-05-06T06:47:46+02:00</published><updated>2024-05-06T06:47:46+02:00</updated><content type="html"><![CDATA[<p>Sometimes, you need to be able to constrain a type-parameter with a method, but
+that method should be defined on the pointer type. For example, say you want to
+parse some bytes using JSON and pass the result to a handler. You might try
+to write this as</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">Handle</span><span class="p">[</span><span class="nx">M</span> <span class="nx">json</span><span class="p">.</span><span class="nx">Unmarshaler</span><span class="p">](</span><span class="nx">b</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">,</span> <span class="nx">handler</span> <span class="kd">func</span><span class="p">(</span><span class="nx">M</span><span class="p">)</span> <span class="kt">error</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">m</span> <span class="nx">M</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">m</span><span class="p">.</span><span class="nf">UnmarshalJSON</span><span class="p">(</span><span class="nx">b</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nf">handler</span><span class="p">(</span><span class="nx">m</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div><p>However, this code does not work. Say you have a type <code>Message</code>, which
+implements <code>json.Unmarshaler</code> with a pointer receiver (it needs to use a
+pointer receiver, as it needs to be able to modify data):</p>
+<ol>
+<li>If you try to call <code>Handle[Message]</code>, you get a compiler error
+(<a href="https://go.dev/play/p/Iu6rvJ4Ff_K">playground</a>).
+That is because <code>Message</code> does not implement <code>json.Unmarshal</code>, only
+<code>*Message</code> does.</li>
+<li>If you try to call <code>Handle[*Message]</code>, the code panics
+(<a href="https://go.dev/play/p/Y8xn9CU11nd">playground</a>),
+because <code>var m M</code> creates a <code>*Message</code> and initializes that to <code>nil</code>. You
+then call <code>UnmarshalJSON</code> with a <code>nil</code> receiver.</li>
+</ol>
+<p>Neither of these options work. You really want to rewrite <code>Handle</code>, so that it
+says that the <em>pointer</em> to its type parameter implements <code>json.Unmarshaler</code>.
+And this is how to do that (<a href="https://go.dev/play/p/YQuGAc4erQh">playground</a>):</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Unmarshaler</span><span class="p">[</span><span class="nx">M</span> <span class="nx">any</span><span class="p">]</span> <span class="kd">interface</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="o">*</span><span class="nx">M</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">json</span><span class="p">.</span><span class="nx">Unmarshaler</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nx">Handle</span><span class="p">[</span><span class="nx">M</span> <span class="nx">any</span><span class="p">,</span> <span class="nx">PM</span> <span class="nx">Unmarshaler</span><span class="p">[</span><span class="nx">M</span><span class="p">]](</span><span class="nx">b</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">,</span> <span class="nx">handler</span> <span class="kd">func</span><span class="p">(</span><span class="nx">M</span><span class="p">)</span> <span class="kt">error</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">m</span> <span class="nx">M</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// note: you need PM(&amp;m), as the compiler can not infer (yet) that you can
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// call the method of PM on a pointer to M.
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nf">PM</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">m</span><span class="p">).</span><span class="nf">UnmarshalJSON</span><span class="p">(</span><span class="nx">b</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="nx">err</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nf">handler</span><span class="p">(</span><span class="nx">m</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></div>]]></content></entry><entry><title type="html">Constraining Complexity in the Generics Design</title><link href="https://blog.merovius.de/posts/2024-01-05_constraining_complexity/" rel="alternate" type="text/html"/><id>https://blog.merovius.de/posts/2024-01-05_constraining_complexity/</id><published>2024-01-05T08:19:00+01:00</published><updated>2024-01-05T08:19:00+01:00</updated><content type="html"><![CDATA[<script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"></script>
 <p><em>[2024-01-13: I added <a href="#option-4-delay-constraint-checking-until-instantiation">a section</a> with an option I forgot to put into my talk and thus elided from the initial post as well.]</em></p>
 <p>I gave a talk at <a href="https://gophercon.com.au/" title="GopherConAU Website">GopherConAU 2023</a> about a particular problem we encountered when designing generics for Go and what we might do about it.</p>
 <p>This blog post is meant as a supplement to that talk.
