@@ -55,3 +55,48 @@ func Handle[M any, PM Unmarshaler[M]](b []byte, handler func(M) error) error {
 	return handler(m)
 }
 ```
+
+I should mention that I recommend avoiding this pattern, if you can. For the
+simple reason that it is a bit of machinery and extra API surface that makes
+the code harder to understand. And often, this is completely unnecessary.
+
+For example, a slightly different version of this example (which is more
+commonly used to demonstrate the question) might look roughly like this:
+
+```go
+type Unmarshaler[M any] interface {
+	*M
+	json.Unmarshaler
+}
+
+func UnmarshalAndLog[M any, PM Unmarshaler[M]](b []byte) (M, error) {
+    var m M
+    if err := PM(&m).UnmarshalJSON(b); err != nil {
+        log.Println("Error unmarshaling:", err)
+        return m, err
+    }
+    log.Println("Got message:", m)
+    return m, nil
+}
+
+// called as: m, err := UnmarshalAndLog[Message](b)
+```
+
+In this case I would prefer to instead write
+
+```go
+func UnmarshalAndLog(b []byte, m json.Unmarshaler) error {
+    if err := m.UnmarshalJSON(b); err != nil {
+        log.Println("Error unmarshaling:", err)
+        return err
+    }
+    log.Println("Got message:", m)
+    return nil
+}
+
+// called as: m := new(Message); err := UnmarshalAndLog(b, m)
+```
+
+While this requires a little bit more code at the call site (especially as you
+need a separate variable declaration), it avoids all the extra machinery and
+introducing a (usually bad) name for the constraint.
